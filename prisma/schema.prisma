@@ -1,0 +1,461 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum PermitType {
+  ISAG
+  CSAG
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  INITIAL_CHECK
+  TECHNICAL_REVIEW
+  FOR_FINAL_APPROVAL
+  FOR_ACTION
+  APPROVED
+  REJECTED
+  RETURNED
+  PAYMENT_PENDING
+  PERMIT_ISSUED
+}
+
+enum Decision {
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  VERIFIED
+}
+
+enum DocumentType {
+  // Mandatory Requirements
+  APPLICATION_FORM
+  SURVEY_PLAN
+  LOCATION_MAP
+  WORK_PROGRAM
+  IEE_REPORT
+  EPEP
+  PROOF_TECHNICAL_COMPETENCE
+  PROOF_FINANCIAL_CAPABILITY
+  ARTICLES_INCORPORATION
+  OTHER_SUPPORTING_PAPERS
+  
+  // Other Requirements
+  AREA_STATUS_CLEARANCE_CENRO
+  AREA_STATUS_CLEARANCE_MGB
+  CERTIFICATE_POSTING_BARANGAY
+  CERTIFICATE_POSTING_MUNICIPAL
+  CERTIFICATE_POSTING_PROVINCIAL
+  CERTIFICATE_POSTING_CENRO
+  CERTIFICATE_POSTING_PENRO
+  CERTIFICATE_POSTING_MGB
+  ECC
+  SANGGUNIAN_ENDORSEMENT_BARANGAY
+  SANGGUNIAN_ENDORSEMENT_MUNICIPAL
+  SANGGUNIAN_ENDORSEMENT_PROVINCIAL
+  FIELD_VERIFICATION_REPORT
+  SURETY_BOND
+  
+  // Additional/Returned Documents
+  ADDITIONAL_DOCUMENT
+  REVISED_DOCUMENT
+}
+
+enum CommentType {
+  REMARK
+  CLARIFICATION
+  REVISION_REQUEST
+  APPROVAL_NOTE
+  REJECTION_REASON
+}
+
+enum AdminRole {
+  ADMIN
+  EVALUATOR
+  REVIEWER
+  PMRB
+  REGIONAL_DIRECTOR
+}
+
+enum EvaluationType {
+  INITIAL_CHECK
+  TECHNICAL_REVIEW
+  FINAL_APPROVAL
+}
+
+enum ChecklistCategory {
+  DOCUMENT_VERIFICATION
+  OTHER_REQUIREMENTS
+  TECHNICAL_REVIEW
+}
+
+enum NotificationType {
+  APPLICATION_SUBMITTED
+  APPLICATION_RETURNED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  PAYMENT_REQUIRED
+  PERMIT_READY
+  STATUS_CHANGED
+  COMMENT_ADDED
+  DOCUMENT_REQUIRED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  fullName      String
+  birthdate     DateTime
+  mobileNumber  String?
+  
+  // Business Information
+  companyName   String?
+  address       String?
+  
+  // Government ID
+  governmentIdUrl String?
+  
+  // Account Status
+  emailVerified Boolean  @default(false)
+  emailVerificationToken String? @unique
+  passwordResetToken     String? @unique
+  passwordResetExpires   DateTime?
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relations
+  applications  Application[]
+  notifications Notification[]
+  
+  @@map("users")
+}
+
+model Application {
+  id            String   @id @default(cuid())
+  applicationNo String  @unique @default(uuid())
+  
+  // Permit Type
+  permitType   PermitType
+  
+  // Applicant Information
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Project Information
+  projectName  String?
+  projectArea  Decimal? @db.Decimal(15, 2)
+  footprintArea Decimal? @db.Decimal(15, 2)
+  numEmployees Int?
+  projectCost  Decimal? @db.Decimal(15, 2)
+  
+  // Application Status
+  status       ApplicationStatus @default(DRAFT)
+  
+  // Current Step (for draft applications)
+  currentStep  Int      @default(1)
+  
+  // Submission
+  submittedAt  DateTime?
+  submittedTo  String?
+  
+  // Evaluation
+  assignedTo  String?
+  assignedAdmin AdminUser? @relation("AssignedApplications", fields: [assignedTo], references: [id])
+  evaluatedBy String?
+  reviewedBy  String?
+  approvedBy  String?
+  
+  // Decision
+  decision     Decision?
+  decisionDate DateTime?
+  decisionReason String? @db.Text
+  
+  // Payment
+  paymentStatus PaymentStatus @default(PENDING)
+  orderOfPaymentUrl String?
+  paymentReceiptUrl String?
+  paymentDate  DateTime?
+  
+  // Permit
+  permitNumber String?
+  permitUrl    String?
+  permitIssuedAt DateTime?
+  
+  // Timestamps
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  documents    Document[]
+  statusHistory ApplicationStatusHistory[]
+  comments     Comment[]
+  evaluations  Evaluation[]
+  notifications Notification[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([permitType])
+  @@index([applicationNo])
+  @@index([assignedTo])
+  @@map("applications")
+}
+
+model Document {
+  id            String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Document Information
+  documentType  DocumentType
+  documentName  String
+  fileName      String
+  fileUrl       String
+  fileSize      Int
+  mimeType      String
+  
+  // Document Set (for requirements that need 5 sets)
+  setNumber     Int?
+  
+  // Status
+  isRequired    Boolean  @default(true)
+  isComplete    Boolean  @default(false)
+  remarks       String?  @db.Text
+  
+  // Version Control
+  version       Int      @default(1)
+  replacedAt    DateTime?
+  
+  // Timestamps
+  uploadedAt    DateTime @default(now())
+  uploadedBy    String
+  
+  @@index([applicationId])
+  @@index([documentType])
+  @@map("documents")
+}
+
+model ApplicationStatusHistory {
+  id            String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Status Change
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedBy     String
+  changedByRole String
+  
+  // Remarks
+  remarks       String?  @db.Text
+  
+  // Attachments (evaluation reports, etc.)
+  attachmentUrl String?
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  
+  @@index([applicationId])
+  @@index([toStatus])
+  @@map("application_status_history")
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Comment Details
+  content       String   @db.Text
+  commentType   CommentType @default(REMARK)
+  
+  // Author
+  authorId      String
+  authorRole    String
+  authorName    String
+  
+  // Reply/Thread
+  parentId      String?
+  parent        Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies       Comment[] @relation("CommentReplies")
+  
+  // Visibility
+  isInternal    Boolean  @default(false)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([applicationId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model AdminUser {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  
+  // Personal Information
+  fullName      String
+  position      String?
+  department    String?
+  
+  // Role & Permissions
+  role          AdminRole @default(EVALUATOR)
+  permissions   Json?
+  
+  // Account Status
+  isActive      Boolean  @default(true)
+  emailVerified Boolean @default(false)
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+  
+  // Relations
+  evaluations   Evaluation[]
+  assignedApplications Application[] @relation("AssignedApplications")
+  
+  @@map("admin_users")
+}
+
+model Evaluation {
+  id            String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Evaluator
+  evaluatorId   String
+  evaluator     AdminUser @relation(fields: [evaluatorId], references: [id])
+  
+  // Evaluation Type
+  evaluationType EvaluationType
+  
+  // Checklist
+  checklistItems EvaluationChecklistItem[]
+  
+  // Summary
+  isCompliant   Boolean?
+  summary       String?  @db.Text
+  
+  // Signatures
+  evaluatedBy   String?
+  evaluatedSignature String?
+  evaluatedDate DateTime?
+  
+  reviewedBy    String?
+  reviewedSignature String?
+  reviewedDate  DateTime?
+  
+  approvedBy    String?
+  approvedSignature String?
+  approvedDate  DateTime?
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([applicationId, evaluationType])
+  @@index([applicationId])
+  @@index([evaluatorId])
+  @@map("evaluations")
+}
+
+model EvaluationChecklistItem {
+  id            String   @id @default(cuid())
+  evaluationId  String
+  evaluation    Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  
+  // Checklist Item
+  itemNumber    Int
+  itemName      String
+  category      ChecklistCategory
+  
+  // Status
+  isComplete    Boolean  @default(false)
+  isCompliant   Boolean?
+  remarks       String?  @db.Text
+  
+  // Timestamps
+  checkedAt     DateTime?
+  checkedBy     String?
+  
+  @@index([evaluationId])
+  @@map("evaluation_checklist_items")
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  
+  // Recipient
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminUserId   String?
+  
+  // Related Application
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Notification Details
+  type          NotificationType
+  title         String
+  message      String   @db.Text
+  link          String?
+  
+  // Status
+  isRead        Boolean  @default(false)
+  readAt        DateTime?
+  
+  // Email
+  emailSent     Boolean  @default(false)
+  emailSentAt   DateTime?
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  
+  @@index([userId])
+  @@index([adminUserId])
+  @@index([applicationId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model SystemSettings {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  value         String   @db.Text
+  description   String?
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+  
+  @@map("system_settings")
+}

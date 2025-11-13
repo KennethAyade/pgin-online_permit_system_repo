@@ -1,0 +1,119 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { DocumentUpload } from "@/components/application/document-upload"
+import { DOCUMENT_REQUIREMENTS } from "@/lib/constants"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Info, FileText } from "lucide-react"
+
+interface StepMandatoryDocsProps {
+  applicationId?: string
+  permitType: "ISAG" | "CSAG"
+  data: any
+  onUpdate: (data: any) => void
+}
+
+const DOCUMENT_LABELS: Record<string, string> = {
+  APPLICATION_FORM: "Application Form (MGB Form 8-4)",
+  SURVEY_PLAN: "Survey Plan (signed & sealed by deputized Geodetic Engineer)",
+  LOCATION_MAP: "Location Map (NAMRIA Topographic Map 1:50,000)",
+  WORK_PROGRAM: "Work Program (MGB Form 6-2)",
+  IEE_REPORT: "Initial Environmental Examination (IEE) Report",
+  EPEP: "Environmental Protection and Enhancement Program (MGB Form 16-2) - ISAG only",
+  PROOF_TECHNICAL_COMPETENCE: "Proof of Technical Competence (CVs, Licenses, Track Records)",
+  PROOF_FINANCIAL_CAPABILITY: "Proof of Financial Capability (Assets, FS, ITRs, Credit Lines, etc.)",
+  ARTICLES_INCORPORATION: "Articles of Incorporation / Partnership / Association (SEC Certified)",
+  OTHER_SUPPORTING_PAPERS: "Other Supporting Papers",
+}
+
+export function StepMandatoryDocs({
+  applicationId,
+  permitType,
+  data,
+  onUpdate,
+}: StepMandatoryDocsProps) {
+  const [documents, setDocuments] = useState<any[]>([])
+
+  useEffect(() => {
+    if (applicationId) {
+      fetchDocuments()
+    }
+  }, [applicationId])
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await fetch(`/api/applications/${applicationId}`)
+      const result = await response.json()
+      if (result.application) {
+        setDocuments(result.application.documents || [])
+      }
+    } catch (error) {
+      console.error("Error fetching documents:", error)
+    }
+  }
+
+  const requirements = permitType === "ISAG"
+    ? DOCUMENT_REQUIREMENTS.ISAG.mandatory
+    : DOCUMENT_REQUIREMENTS.CSAG.mandatory
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Mandatory Requirements</h3>
+        <p className="text-sm text-gray-600">
+          Upload all required documents. Each document must be in PDF format, maximum 10MB.
+        </p>
+      </div>
+
+      {!applicationId ? (
+        <Alert variant="destructive" className="border-red-300 bg-red-50">
+          <AlertDescription className="text-red-800">
+            Please complete the previous steps first to create an application.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <>
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-700" />
+            <AlertDescription className="text-blue-800 text-sm">
+              <strong>Document Requirements:</strong> All documents must be clear, legible, and properly signed/sealed where required.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-4">
+            {requirements.map((docType, index) => {
+              const existingDoc = documents.find(
+                (doc) => doc.documentType === docType
+              )
+
+              return (
+                <div key={docType} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="bg-blue-100 p-2 rounded-lg mt-1">
+                      <FileText className="h-4 w-4 text-blue-700" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
+                        <h4 className="text-sm font-semibold text-gray-900">
+                          {DOCUMENT_LABELS[docType] || docType}
+                        </h4>
+                      </div>
+                      <DocumentUpload
+                        applicationId={applicationId}
+                        documentType={docType}
+                        documentName={DOCUMENT_LABELS[docType] || docType}
+                        onUploadSuccess={fetchDocuments}
+                        existingDocument={existingDoc}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
