@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Upload, X, File, Loader2, CheckCircle2, Download } from "lucide-react"
 import { MAX_FILE_SIZE } from "@/lib/constants"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 
 interface DocumentUploadProps {
   applicationId: string
@@ -32,6 +33,7 @@ export function DocumentUpload({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -116,7 +118,7 @@ export function DocumentUpload({
 
   return (
     <div className="space-y-3">
-      {existingDocument ? (
+      {existingDocument && (
         <div className="flex items-center justify-between p-4 bg-white border-2 border-green-200 rounded-lg">
           <div className="flex items-center gap-3">
             <div className="bg-green-100 p-2 rounded-lg">
@@ -132,7 +134,7 @@ export function DocumentUpload({
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleDownload}
+              onClick={() => setPreviewOpen(true)}
               className="border-gray-300 hover:bg-gray-50"
             >
               <Download className="h-4 w-4 mr-1" />
@@ -149,28 +151,30 @@ export function DocumentUpload({
             </Button>
           </div>
         </div>
-      ) : (
-        <div
-          {...getRootProps()}
-          className={cn(
-            "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
-            isDragActive
-              ? "border-blue-500 bg-blue-50"
-              : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-          )}
-        >
-          <input {...getInputProps()} />
-          <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-          <p className="text-sm font-medium text-gray-700 mb-1">
-            {isDragActive
-              ? "Drop the PDF file here"
-              : "Drag & drop a PDF file here, or click to select"}
-          </p>
-          <p className="text-xs text-gray-500">
-            PDF only, max {MAX_FILE_SIZE / 1024 / 1024}MB
-          </p>
-        </div>
       )}
+
+      <div
+        {...getRootProps()}
+        className={cn(
+          "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
+          isDragActive
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
+        )}
+      >
+        <input {...getInputProps()} />
+        <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
+        <p className="text-sm font-medium text-gray-700 mb-1">
+          {isDragActive
+            ? "Drop the PDF file here"
+            : existingDocument
+            ? "Drag & drop a new version here, or click to replace"
+            : "Drag & drop a PDF file here, or click to select"}
+        </p>
+        <p className="text-xs text-gray-500">
+          PDF only, max {MAX_FILE_SIZE / 1024 / 1024}MB
+        </p>
+      </div>
 
       {uploading && (
         <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-3 rounded-lg">
@@ -190,6 +194,34 @@ export function DocumentUpload({
         <Alert variant="destructive" className="border-red-300 bg-red-50">
           <AlertDescription className="text-red-800">{error}</AlertDescription>
         </Alert>
+      )}
+
+      {existingDocument && (
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>View document</DialogTitle>
+              <DialogDescription>
+                <span className="font-semibold">{existingDocument.fileName}</span> • Version {existingDocument.version}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-2 border rounded-md overflow-hidden">
+              <iframe
+                src={`/api/documents/${existingDocument.id}?inline=1`}
+                className="w-full h-[70vh]"
+              />
+            </div>
+            <DialogFooter className="mt-4">
+              <Button variant="outline" type="button" onClick={() => setPreviewOpen(false)}>
+                Close
+              </Button>
+              <Button variant="outline" type="button" onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-1" />
+                Download PDF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

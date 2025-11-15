@@ -5,66 +5,85 @@ import { Building2, Shield, CheckCircle } from "lucide-react"
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-      <div className="w-full max-w-3xl">
-        <div className="mb-6 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-900 text-white rounded mb-3">
-            <Building2 className="h-6 w-6" />
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Branding header */}
+      <header className="pt-10 pb-4 flex justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-700 text-white shadow-sm">
+            <Building2 className="h-7 w-7" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-1">SAG Permit System</h1>
-          <p className="text-sm text-gray-600">MGB Regional Office / PGIN</p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">SAG Permit System</h1>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+            MGB Regional Office / PGIN
+          </p>
         </div>
+      </header>
 
-        <div className="grid md:grid-cols-2 gap-5">
-          <Card className="border border-gray-200">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold text-gray-900">Create Account</CardTitle>
-              <CardDescription className="text-gray-600 text-sm">
+      {/* Main content */}
+      <main className="flex-1 px-4 pb-10">
+        <div className="mx-auto flex max-w-5xl flex-col gap-8 md:flex-row md:items-start">
+          {/* Left: registration card */}
+          <Card className="w-full shadow-sm border-slate-200 md:flex-1">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-slate-900">
+                Create Account
+              </CardTitle>
+              <CardDescription className="mt-1 text-sm text-slate-600">
                 Register to submit permit applications online
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-2">
               <RegistrationForm />
-              <div className="mt-5 text-center text-sm">
-                <span className="text-gray-600">Already have an account? </span>
-                <Link href="/login" className="text-blue-900 hover:text-blue-800 font-medium hover:underline">
+              <div className="mt-5 text-center text-xs md:text-sm">
+                <span className="text-slate-600">Already have an account? </span>
+                <Link
+                  href="/login"
+                  className="font-medium text-blue-700 hover:text-blue-800 hover:underline"
+                >
                   Sign in here
                 </Link>
               </div>
             </CardContent>
           </Card>
 
-          <div className="space-y-4">
-            <Card className="bg-blue-50 border border-blue-100">
-              <CardHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="h-4 w-4 text-blue-900" />
-                  <CardTitle className="text-base font-semibold text-gray-900">Secure Registration</CardTitle>
+          {/* Right: security + requirements column */}
+          <div className="w-full md:w-80 space-y-4">
+            <Card className="border-blue-100 bg-blue-50/70">
+              <CardHeader className="pb-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-blue-700 shadow-xs">
+                    <Shield className="h-4 w-4" />
+                  </span>
+                  <CardTitle className="text-sm font-semibold text-slate-900">
+                    Secure Registration
+                  </CardTitle>
                 </div>
-                <CardDescription className="text-gray-700 text-sm">
-                  Your information is protected with government-grade security
+                <CardDescription className="text-xs leading-relaxed text-slate-700">
+                  Your information is protected with government-grade security.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="border border-gray-200">
+            <Card className="border-slate-200 bg-white">
               <CardHeader>
-                <CardTitle className="text-base font-semibold text-gray-900 mb-3">Requirements</CardTitle>
-                <ul className="space-y-2 text-sm text-gray-700">
+                <CardTitle className="text-sm font-semibold text-slate-900">
+                  Requirements
+                </CardTitle>
+                <ul className="mt-3 space-y-2 text-xs text-slate-700">
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="mt-[2px] h-4 w-4 flex-shrink-0 text-emerald-500" />
                     <span>Valid email address</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="mt-[2px] h-4 w-4 flex-shrink-0 text-emerald-500" />
                     <span>Personal information</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="mt-[2px] h-4 w-4 flex-shrink-0 text-emerald-500" />
                     <span>Government-issued ID</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle className="h-4 w-4 text-gray-600 mt-0.5 flex-shrink-0" />
+                    <CheckCircle className="mt-[2px] h-4 w-4 flex-shrink-0 text-emerald-500" />
                     <span>Project details (for applications)</span>
                   </li>
                 </ul>
@@ -72,11 +91,12 @@ export default function RegisterPage() {
             </Card>
           </div>
         </div>
+      </main>
 
-        <p className="mt-5 text-center text-xs text-gray-500">
-          Official Government Portal
-        </p>
-      </div>
+      {/* Footer */}
+      <footer className="pb-8 text-center text-[11px] text-slate-400">
+        Official Government Portal
+      </footer>
     </div>
   )
 }

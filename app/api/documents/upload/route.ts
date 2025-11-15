@@ -47,10 +47,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Only allow document uploads to DRAFT applications
-    if (application.status !== "DRAFT") {
+    // Allow document uploads for draft and returned/for-action applications
+    const allowedStatuses = ["DRAFT", "RETURNED", "FOR_ACTION"] as const
+    if (!allowedStatuses.includes(application.status as any)) {
       return NextResponse.json(
-        { error: "Cannot upload documents to submitted application" },
+        { error: "Cannot upload documents for this application status" },
         { status: 400 }
       )
     }

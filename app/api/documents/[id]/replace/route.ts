@@ -58,10 +58,11 @@ export async function PUT(
       )
     }
 
-    // Only allow replacement in DRAFT applications
-    if (existingDocument.application.status !== "DRAFT") {
+    // Allow replacement in draft and returned/for-action applications
+    const allowedStatuses = ["DRAFT", "RETURNED", "FOR_ACTION"] as const
+    if (!allowedStatuses.includes(existingDocument.application.status as any)) {
       return NextResponse.json(
-        { error: "Cannot replace document in submitted application" },
+        { error: "Cannot replace document for this application status" },
         { status: 400 }
       )
     }

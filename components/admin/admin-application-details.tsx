@@ -180,6 +180,7 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
             documents={application.documents || []}
             applicationId={application.id}
             applicationStatus={application.status}
+            evaluations={application.evaluations || []}
           />
         </TabsContent>
 

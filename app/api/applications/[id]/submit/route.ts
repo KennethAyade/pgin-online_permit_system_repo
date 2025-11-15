@@ -43,10 +43,11 @@ export async function POST(
       )
     }
 
-    // Only allow submission of DRAFT applications
-    if (application.status !== "DRAFT") {
+    // Allow submission of new or revised applications
+    const allowedStatuses = ["DRAFT", "RETURNED", "FOR_ACTION"] as const
+    if (!allowedStatuses.includes(application.status as any)) {
       return NextResponse.json(
-        { error: "Application already submitted" },
+        { error: "Application cannot be submitted in its current status" },
         { status: 400 }
       )
     }
@@ -90,6 +91,9 @@ export async function POST(
       )
     }
 
+    const previousStatus = application.status
+    const isResubmission = previousStatus === "RETURNED" || previousStatus === "FOR_ACTION"
+
     // Update application status to SUBMITTED
     const updatedApplication = await prisma.application.update({
       where: { id },
@@ -104,11 +108,13 @@ export async function POST(
     await prisma.applicationStatusHistory.create({
       data: {
         applicationId: application.id,
-        fromStatus: "DRAFT",
+        fromStatus: previousStatus,
         toStatus: "SUBMITTED",
         changedBy: session.user.id,
         changedByRole: "applicant",
-        remarks: "Application submitted by applicant",
+        remarks: isResubmission
+          ? "Application resubmitted by applicant"
+          : "Application submitted by applicant",
       },
     })
 
@@ -117,8 +123,10 @@ export async function POST(
       data: {
         applicationId: application.id,
         type: "APPLICATION_SUBMITTED",
-        title: "New Application Submitted",
-        message: `Application ${application.applicationNo} has been submitted by ${application.user.fullName}`,
+        title: isResubmission ? "Application Resubmitted" : "New Application Submitted",
+        message: isResubmission
+          ? `Application ${application.applicationNo} has been resubmitted by ${application.user.fullName}`
+          : `Application ${application.applicationNo} has been submitted by ${application.user.fullName}`,
         link: `/admin/applications/${application.id}`,
       },
     })
@@ -126,11 +134,15 @@ export async function POST(
     // Send email notification to user
     await sendEmail({
       to: application.user.email,
-      subject: "Application Submitted - SAG Permit System",
+      subject: isResubmission
+        ? "Application Resubmitted - SAG Permit System"
+        : "Application Submitted - SAG Permit System",
       html: `
-        <h2>Application Submitted Successfully</h2>
+        <h2>Application ${isResubmission ? "Resubmitted" : "Submitted"} Successfully</h2>
         <p>Hello ${application.user.fullName},</p>
-        <p>Your application (${application.applicationNo}) has been submitted successfully.</p>
+        <p>Your application (${application.applicationNo}) has been ${
+          isResubmission ? "resubmitted" : "submitted"
+        } successfully.</p>
         <p>You can track its status in your dashboard.</p>
       `,
     })

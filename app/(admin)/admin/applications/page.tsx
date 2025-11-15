@@ -11,8 +11,8 @@ export default function AdminApplicationsPage() {
   const [applications, setApplications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    status: "",
-    permitType: "",
+    status: "all", // "all" = no status filter
+    permitType: "all", // "all" = no permitType filter
     search: "",
   })
 
@@ -24,8 +24,8 @@ export default function AdminApplicationsPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (filters.status) params.append("status", filters.status)
-      if (filters.permitType) params.append("permitType", filters.permitType)
+      if (filters.status !== "all") params.append("status", filters.status)
+      if (filters.permitType !== "all") params.append("permitType", filters.permitType)
 
       const response = await fetch(`/api/admin/applications?${params.toString()}`)
       const result = await response.json()
@@ -89,7 +89,7 @@ export default function AdminApplicationsPage() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="SUBMITTED">Submitted</SelectItem>
                 <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
                 <SelectItem value="INITIAL_CHECK">Initial Check</SelectItem>
@@ -108,7 +108,7 @@ export default function AdminApplicationsPage() {
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="ISAG">ISAG</SelectItem>
                 <SelectItem value="CSAG">CSAG</SelectItem>
               </SelectContent>

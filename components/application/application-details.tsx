@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "./status-badge"
@@ -8,7 +9,8 @@ import { DocumentList } from "./document-list"
 import { CommentsSection } from "./comments-section"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Clock, MessageSquare, History } from "lucide-react"
+import { FileText, Clock, MessageSquare, History, ClipboardCheck } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ApplicationDetailsProps {
   application: any
@@ -16,6 +18,46 @@ interface ApplicationDetailsProps {
 }
 
 export function ApplicationDetails({ application, onUpdate }: ApplicationDetailsProps) {
+  const canResubmit = application.status === "RETURNED" || application.status === "FOR_ACTION"
+  const [submitLoading, setSubmitLoading] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+
+  const handleResubmit = async () => {
+    try {
+      setSubmitLoading(true)
+      setSubmitError(null)
+      setSubmitSuccess(null)
+
+      const response = await fetch(`/api/applications/${application.id}/submit`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        if (result.missingDocuments && Array.isArray(result.missingDocuments)) {
+          setSubmitError(
+            `Missing required documents: ${result.missingDocuments.join(", ")}`
+          )
+        } else {
+          setSubmitError(result.error || "Failed to submit application")
+        }
+        return
+      }
+
+      if (onUpdate) {
+        onUpdate()
+      }
+      setSubmitSuccess("Application submitted successfully")
+    } catch (error) {
+      console.error("Error submitting application:", error)
+      setSubmitError("An error occurred while submitting the application")
+    } finally {
+      setSubmitLoading(false)
+    }
+  }
+
   return (
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsList className="bg-white border border-gray-200 p-1">
@@ -31,6 +73,10 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
           <History className="h-4 w-4 mr-2" />
           Status History
         </TabsTrigger>
+        <TabsTrigger value="evaluations" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+          <ClipboardCheck className="h-4 w-4 mr-2" />
+          Evaluations
+        </TabsTrigger>
         <TabsTrigger value="comments" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
           <MessageSquare className="h-4 w-4 mr-2" />
           Comments
@@ -38,6 +84,28 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
+        {submitError && (
+          <Alert variant="destructive" className="border-red-300 bg-red-50">
+            <AlertDescription className="text-red-800">{submitError}</AlertDescription>
+          </Alert>
+        )}
+        {submitSuccess && (
+          <Alert className="border-green-300 bg-green-50">
+            <AlertDescription className="text-green-800">{submitSuccess}</AlertDescription>
+          </Alert>
+        )}
+        {canResubmit && (
+          <div className="flex justify-end mb-2">
+            <button
+              type="button"
+              onClick={handleResubmit}
+              disabled={submitLoading}
+              className="inline-flex items-center px-4 py-2 rounded-md bg-blue-700 text-white text-sm font-medium hover:bg-blue-800 shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {submitLoading ? "Submitting..." : "Resubmit Application"}
+            </button>
+          </div>
+        )}
         <Card className="border-gray-200 shadow-sm">
           <CardHeader className="bg-gray-50 border-b border-gray-200">
             <CardTitle className="text-lg font-semibold text-gray-900">Application Information</CardTitle>
@@ -114,11 +182,60 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
           documents={application.documents || []}
           applicationId={application.id}
           applicationStatus={application.status}
+          canEdit={canResubmit}
+          onRefresh={onUpdate}
+          evaluations={application.evaluations || []}
         />
       </TabsContent>
 
       <TabsContent value="status">
         <StatusTimeline statusHistory={application.statusHistory || []} />
+      </TabsContent>
+
+      <TabsContent value="evaluations">
+        <div className="space-y-4">
+          {application.evaluations && application.evaluations.length > 0 ? (
+            application.evaluations.map((evaluation: any) => (
+              <Card key={evaluation.id} className="border-gray-200 shadow-sm">
+                <CardHeader className="bg-gray-50 border-b border-gray-200">
+                  <CardTitle className="text-lg font-semibold text-gray-900">
+                    {evaluation.evaluationType.replace(/_/g, " ")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Evaluated by: <span className="font-medium text-gray-900">{evaluation.evaluator?.fullName || "N/A"}</span>
+                  </p>
+                  <div className="space-y-2">
+                    {evaluation.checklistItems?.map((item: any) => (
+                      <div key={item.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                        <span className="text-sm flex-1">{item.itemName}</span>
+                        {item.isCompliant ? (
+                          <Badge className="bg-green-100 text-green-800 border-green-300">Compliant</Badge>
+                        ) : (
+                          <Badge className="bg-red-100 text-red-800 border-red-300">Non-compliant</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {evaluation.summary && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Summary</p>
+                      <p className="text-sm text-gray-900">{evaluation.summary}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className="border-gray-200 shadow-sm">
+              <CardContent className="py-12 text-center text-gray-500">
+                <ClipboardCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <p>No evaluations yet</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </TabsContent>
 
       <TabsContent value="comments">

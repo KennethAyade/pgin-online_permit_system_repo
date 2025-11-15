@@ -41,7 +41,8 @@ export async function GET(
     }
 
     // Check if user owns the application or is admin
-    if (document.application.userId !== session.user.id) {
+    const isAdmin = (session.user as any)?.role === "admin"
+    if (document.application.userId !== session.user.id && !isAdmin) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403 }
@@ -54,10 +55,12 @@ export async function GET(
     try {
       const fileBuffer = await readFile(filePath)
       
+      const inline = request.nextUrl.searchParams.get("inline") === "1"
+
       return new NextResponse(fileBuffer, {
         headers: {
           "Content-Type": document.mimeType,
-          "Content-Disposition": `attachment; filename="${document.fileName}"`,
+          "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${document.fileName}"`,
           "Content-Length": document.fileSize.toString(),
         },
       })
