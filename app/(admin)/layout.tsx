@@ -14,7 +14,7 @@ export default function AdminLayout({
         <Header />
         <div className="flex flex-1">
           <AdminSidebar />
-          <main className="flex-1 p-6">
+          <main className="flex-1 bg-gray-50 px-6 py-6">
             {children}
           </main>
         </div>
