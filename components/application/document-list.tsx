@@ -123,79 +123,81 @@ export function DocumentList({
                             </Badge>
                           )}
                         </p>
-                    <p className="text-xs text-gray-500">
-                      {document.fileName} • Version {document.version}
-                    </p>
-                    {document.remarks && (
-                      <p className="text-xs text-gray-600 mt-1 italic">{document.remarks}</p>
-                    )}
+                        <p className="text-xs text-gray-500">
+                          {document.fileName} • Version {document.version}
+                        </p>
+                        {document.remarks && (
+                          <p className="text-xs text-gray-600 mt-1 italic">{document.remarks}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {document.isComplete ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-gray-400" />
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreviewDocument(document)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(document.id)}
+                        className="border-gray-300 hover:bg-gray-50"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                      {canEdit && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setEditingDocumentId(
+                              editingDocumentId === document.id ? null : document.id
+                            )
+                          }
+                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                        >
+                          Replace
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {document.isComplete ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  ) : (
-                    <XCircle className="h-5 w-5 text-gray-400" />
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setPreviewDocument(document)}
-                    className="border-gray-300 hover:bg-gray-50"
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(document.id)}
-                    className="border-gray-300 hover:bg-gray-50"
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
-                  </Button>
-                  {canEdit && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setEditingDocumentId(
-                          editingDocumentId === document.id ? null : document.id
-                        )
-                      }
-                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                    >
-                      Replace
-                    </Button>
-                  )}
-                </div>
-                {canEdit && editingDocumentId === document.id && (
-                  <div className="mt-4 border-t border-gray-200 pt-4">
-                    <DocumentUpload
-                      applicationId={applicationId}
-                      documentType={document.documentType}
-                      documentName={
-                        DOCUMENT_LABELS[document.documentType] || document.documentType
-                      }
-                      onUploadSuccess={() => {
-                        setEditingDocumentId(null)
-                        if (onRefresh) {
-                          onRefresh()
+                  {canEdit && editingDocumentId === document.id && (
+                    <div className="mt-4 border-t border-gray-200 pt-4">
+                      <DocumentUpload
+                        applicationId={applicationId}
+                        documentType={document.documentType}
+                        documentName={
+                          DOCUMENT_LABELS[document.documentType] || document.documentType
                         }
-                      }}
-                      existingDocument={{
-                        id: document.id,
-                        fileName: document.fileName,
-                        fileUrl: document.fileUrl,
-                        version: document.version,
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            )})}
-          </div>
+                        onUploadSuccess={() => {
+                          setEditingDocumentId(null)
+                          if (onRefresh) {
+                            onRefresh()
+                          }
+                        }}
+                        existingDocument={{
+                          id: document.id,
+                          fileName: document.fileName,
+                          fileUrl: document.fileUrl,
+                          version: document.version,
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            </div>
         </CardContent>
       </Card>
 

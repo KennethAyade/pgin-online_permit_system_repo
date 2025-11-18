@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { auth } from "@/lib/auth"
 
 /**
  * Admin review of acceptance requirement - Accept or Reject
@@ -17,7 +16,7 @@ import { authOptions } from "@/lib/auth"
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -100,16 +99,15 @@ export async function POST(request: NextRequest) {
         orderBy: { order: "asc" },
       })
 
-      let updatedApp = application
       if (nextRequirement) {
         // Update application to point to next requirement
-        updatedApp = await prisma.application.update({
+        await prisma.application.update({
           where: { id: application.id },
           data: { currentAcceptanceRequirementId: nextRequirement.id },
         })
       } else {
         // All requirements completed
-        updatedApp = await prisma.application.update({
+        await prisma.application.update({
           where: { id: application.id },
           data: {
             currentAcceptanceRequirementId: null,

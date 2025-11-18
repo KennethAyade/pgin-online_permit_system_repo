@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
+import { auth } from "@/lib/auth"
 
 /**
  * Get all acceptance requirements for an application
@@ -11,10 +10,10 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -22,7 +21,8 @@ export async function GET(
       )
     }
 
-    const applicationId = params.id
+    const { id } = await params
+    const applicationId = id
     const applicationType = request.nextUrl.searchParams.get("type") || "user"
 
     // Get application

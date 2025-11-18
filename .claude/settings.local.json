@@ -5,7 +5,8 @@
       "Bash(openssl rand:*)",
       "Bash(npx prisma migrate dev:*)",
       "Bash(npx prisma migrate:*)",
-      "Bash(npx prisma db push:*)"
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
