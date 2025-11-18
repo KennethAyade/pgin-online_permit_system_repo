@@ -1,6 +1,10 @@
 import { z } from "zod"
 
+export const AccountType = z.enum(["INDIVIDUAL", "CORPORATE"])
+export type AccountTypeValue = z.infer<typeof AccountType>
+
 export const registerSchema = z.object({
+  accountType: AccountType,
   email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters")
     .regex(/[a-zA-Z]/, "Password must contain at least one letter")
@@ -9,8 +13,21 @@ export const registerSchema = z.object({
   birthdate: z.date(),
   mobileNumber: z.string().optional(),
   companyName: z.string().optional(),
-  address: z.string().optional(),
+  // Address components
+  region: z.string().min(1, "Region is required"),
+  province: z.string().min(1, "Province is required"),
+  city: z.string().min(1, "City is required"),
+  barangay: z.string().min(1, "Barangay is required"),
   acceptTerms: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
+}).refine((data) => {
+  // Company name is required if accountType is CORPORATE
+  if (data.accountType === "CORPORATE" && !data.companyName) {
+    return false
+  }
+  return true
+}, {
+  message: "Company name is required for corporate accounts",
+  path: ["companyName"],
 })
 
 export const loginSchema = z.object({

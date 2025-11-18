@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { FileText, Clock, CheckCircle2, XCircle, Building2, Users, ArrowRight } from "lucide-react"
+import { FileText, Clock, CheckCircle2, XCircle, Building2, Users, ArrowRight, CheckSquare } from "lucide-react"
+import { AdminAcceptanceRequirementsQueue } from "./acceptance-requirements-queue"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface DashboardStats {
   total: number
@@ -109,7 +111,19 @@ export function AdminDashboard() {
   ]
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="overview" className="space-y-6">
+      <TabsList className="bg-white border border-gray-200 p-1">
+        <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+          <FileText className="h-4 w-4 mr-2" />
+          Overview
+        </TabsTrigger>
+        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+          <CheckSquare className="h-4 w-4 mr-2" />
+          Acceptance Requirements Queue
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-6">
       {/* Statistics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {statCards.map((stat) => {
@@ -196,6 +210,11 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </TabsContent>
+
+      <TabsContent value="acceptance">
+        <AdminAcceptanceRequirementsQueue />
+      </TabsContent>
+    </Tabs>
   )
 }

@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(test:*)",
-      "Bash(openssl rand:*)"
+      "Bash(openssl rand:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx prisma db push:*)"
     ],
     "deny": [],
     "ask": []

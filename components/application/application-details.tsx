@@ -7,9 +7,10 @@ import { StatusBadge } from "./status-badge"
 import { StatusTimeline } from "./status-timeline"
 import { DocumentList } from "./document-list"
 import { CommentsSection } from "./comments-section"
+import { AcceptanceRequirementsSection } from "./acceptance-requirements-section"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Clock, MessageSquare, History, ClipboardCheck } from "lucide-react"
+import { FileText, Clock, MessageSquare, History, ClipboardCheck, CheckSquare } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ApplicationDetailsProps {
@@ -64,6 +65,10 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
         <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
           <FileText className="h-4 w-4 mr-2" />
           Overview
+        </TabsTrigger>
+        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+          <CheckSquare className="h-4 w-4 mr-2" />
+          Acceptance Requirements
         </TabsTrigger>
         <TabsTrigger value="documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
           <FileText className="h-4 w-4 mr-2" />
@@ -175,6 +180,16 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
             </div>
           </CardContent>
         </Card>
+      </TabsContent>
+
+      <TabsContent value="acceptance">
+        <AcceptanceRequirementsSection
+          applicationId={application.id}
+          applicationNo={application.applicationNo}
+          projectName={application.projectName}
+          permitType={application.permitType}
+          currentRequirementId={application.currentAcceptanceRequirementId}
+        />
       </TabsContent>
 
       <TabsContent value="documents">

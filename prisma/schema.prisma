@@ -23,6 +23,7 @@ enum PermitType {
 enum ApplicationStatus {
   DRAFT
   SUBMITTED
+  ACCEPTANCE_IN_PROGRESS
   UNDER_REVIEW
   INITIAL_CHECK
   TECHNICAL_REVIEW
@@ -31,6 +32,7 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   RETURNED
+  VOIDED
   PAYMENT_PENDING
   PERMIT_ISSUED
 }
@@ -119,6 +121,34 @@ enum NotificationType {
   STATUS_CHANGED
   COMMENT_ADDED
   DOCUMENT_REQUIRED
+  REQUIREMENT_ACCEPTED
+  REQUIREMENT_REJECTED
+  REQUIREMENT_REVISION_NEEDED
+  REQUIREMENT_PENDING_REVIEW
+  APPLICATION_VOIDED
+  REQUIREMENT_AUTO_ACCEPTED
+}
+
+enum AcceptanceRequirementStatus {
+  PENDING_SUBMISSION
+  PENDING_REVIEW
+  ACCEPTED
+  REJECTED
+  REVISION_REQUIRED
+}
+
+enum AcceptanceRequirementType {
+  PROJECT_COORDINATES
+  APPLICATION_FORM
+  SURVEY_PLAN
+  LOCATION_MAP
+  WORK_PROGRAM
+  IEE_REPORT
+  EPEP
+  PROOF_TECHNICAL_COMPETENCE
+  PROOF_FINANCIAL_CAPABILITY
+  ARTICLES_INCORPORATION
+  OTHER_SUPPORTING_PAPERS
 }
 
 // ============================================
@@ -132,29 +162,40 @@ model User {
   fullName      String
   birthdate     DateTime
   mobileNumber  String?
-  
+
+  // Account Type
+  accountType   String   @default("INDIVIDUAL") // INDIVIDUAL or CORPORATE
+
   // Business Information
   companyName   String?
+
+  // Address Components (Philippine Divisions)
+  region        String?
+  province      String?
+  city          String?
+  barangay      String?
+
+  // Legacy address field (for backward compatibility - will be deprecated)
   address       String?
-  
+
   // Government ID
   governmentIdUrl String?
-  
+
   // Account Status
   emailVerified Boolean  @default(false)
   emailVerificationToken String? @unique
   passwordResetToken     String? @unique
   passwordResetExpires   DateTime?
-  
+
   // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   lastLoginAt   DateTime?
-  
+
   // Relations
   applications  Application[]
   notifications Notification[]
-  
+
   @@map("users")
 }
 
@@ -209,23 +250,78 @@ model Application {
   permitUrl    String?
   permitIssuedAt DateTime?
   
+  // Acceptance Requirements Tracking
+  currentAcceptanceRequirementId String?
+  acceptanceRequirementsStartedAt DateTime?
+
   // Timestamps
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
+
   // Relations
   documents    Document[]
   statusHistory ApplicationStatusHistory[]
   comments     Comment[]
   evaluations  Evaluation[]
+  acceptanceRequirements AcceptanceRequirement[]
   notifications Notification[]
-  
+
   @@index([userId])
   @@index([status])
   @@index([permitType])
   @@index([applicationNo])
   @@index([assignedTo])
   @@map("applications")
+}
+
+model AcceptanceRequirement {
+  id            String   @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Requirement Details
+  requirementType AcceptanceRequirementType
+  requirementName String
+  requirementDescription String? @db.Text
+  order          Int                                  // Sequence number for this requirement
+
+  // Requirement Data/File
+  submittedData  String?  @db.Text                    // For text data like coordinates
+  submittedFileUrl String?                            // For uploaded files
+  submittedFileName String?
+
+  // Status
+  status         AcceptanceRequirementStatus @default(PENDING_SUBMISSION)
+
+  // Submission
+  submittedAt    DateTime?
+  submittedBy    String   @default("applicant")
+
+  // Admin Review
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  adminRemarks   String?  @db.Text
+  adminRemarkFileUrl String?                          // Optional file attached to remarks
+  adminRemarkFileName String?
+
+  // Deadlines
+  revisionDeadline DateTime?                          // 14 days from rejection
+  autoAcceptDeadline DateTime?                        // Admin evaluation deadline
+
+  // Flags
+  isAutoAccepted Boolean  @default(false)
+  isVoided       Boolean  @default(false)
+  voidedAt       DateTime?
+  voidReason     String?
+
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([applicationId])
+  @@index([status])
+  @@index([order])
+  @@map("acceptance_requirements")
 }
 
 model Document {
