@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
@@ -10,22 +10,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, User, Mail, Lock, Calendar, Phone, Building, MapPin } from "lucide-react"
-import {
-  getRegions,
-  getProvincesByRegion,
-  getCitiesByProvince,
-  getBarangaysByCity,
-} from "@/lib/constants/philippines-divisions"
+import { Loader2, User, Mail, Lock, Calendar, Phone, Building, MapPin, AlertCircle } from "lucide-react"
+import { philippinesAddressAPI } from "@/lib/services/philippines-address-api"
 
 export function RegistrationForm() {
   const router = useRouter()
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [regions, setRegions] = useState<any[]>([])
   const [provinces, setProvinces] = useState<any[]>([])
   const [cities, setCities] = useState<any[]>([])
   const [barangays, setBarangays] = useState<any[]>([])
+  const [loadingRegions, setLoadingRegions] = useState(true)
+  const [loadingProvinces, setLoadingProvinces] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+  const [loadingBarangays, setLoadingBarangays] = useState(false)
+  const [addressError, setAddressError] = useState<string>("")
 
   const {
     register,
@@ -43,15 +44,29 @@ export function RegistrationForm() {
   const selectedCity = watch("city")
   const acceptTerms = watch("acceptTerms")
 
-  const regions = getRegions()
+  // Load regions on component mount
+  useEffect(() => {
+    const loadRegions = async () => {
+      setLoadingRegions(true)
+      setAddressError("")
+      try {
+        const data = await philippinesAddressAPI.getRegions()
+        setRegions(data)
+      } catch (err) {
+        console.error("Error loading regions:", err)
+        setAddressError("Failed to load regions. Please refresh the page.")
+      } finally {
+        setLoadingRegions(false)
+      }
+    }
+    loadRegions()
+  }, [])
 
   // Handle region change
-  const handleRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleRegionChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const regionCode = e.target.value
     setValue("region", regionCode)
-
-    const provincesList = getProvincesByRegion(regionCode)
-    setProvinces(provincesList)
+    setAddressError("")
 
     // Reset dependent fields
     setValue("province", "")
@@ -59,32 +74,79 @@ export function RegistrationForm() {
     setValue("barangay", "")
     setCities([])
     setBarangays([])
+
+    if (!regionCode) {
+      setProvinces([])
+      return
+    }
+
+    setLoadingProvinces(true)
+    try {
+      const data = await philippinesAddressAPI.getProvincesByRegion(regionCode)
+      setProvinces(data)
+    } catch (err) {
+      console.error("Error loading provinces:", err)
+      setAddressError("Failed to load provinces. Please try again.")
+      setProvinces([])
+    } finally {
+      setLoadingProvinces(false)
+    }
   }
 
   // Handle province change
-  const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const provinceName = e.target.value
-    setValue("province", provinceName)
-
-    const citiesList = getCitiesByProvince(selectedRegion, provinceName)
-    setCities(citiesList)
+  const handleProvinceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const provinceCode = e.target.value
+    setValue("province", provinceCode)
+    setAddressError("")
 
     // Reset dependent fields
     setValue("city", "")
     setValue("barangay", "")
     setBarangays([])
+
+    if (!provinceCode) {
+      setCities([])
+      return
+    }
+
+    setLoadingCities(true)
+    try {
+      const data = await philippinesAddressAPI.getCitiesByProvince(selectedRegion, provinceCode)
+      setCities(data)
+    } catch (err) {
+      console.error("Error loading cities:", err)
+      setAddressError("Failed to load cities. Please try again.")
+      setCities([])
+    } finally {
+      setLoadingCities(false)
+    }
   }
 
   // Handle city change
-  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const cityName = e.target.value
-    setValue("city", cityName)
-
-    const barangaysList = getBarangaysByCity(selectedRegion, selectedProvince, cityName)
-    setBarangays(barangaysList)
+  const handleCityChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const cityCode = e.target.value
+    setValue("city", cityCode)
+    setAddressError("")
 
     // Reset barangay
     setValue("barangay", "")
+
+    if (!cityCode) {
+      setBarangays([])
+      return
+    }
+
+    setLoadingBarangays(true)
+    try {
+      const data = await philippinesAddressAPI.getBarangaysByCity(cityCode)
+      setBarangays(data)
+    } catch (err) {
+      console.error("Error loading barangays:", err)
+      setAddressError("Failed to load barangays. Please try again.")
+      setBarangays([])
+    } finally {
+      setLoadingBarangays(false)
+    }
   }
 
   const onSubmit = async (data: RegisterInput) => {
@@ -193,7 +255,7 @@ export function RegistrationForm() {
             <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               id="fullName"
-              placeholder="John Doe"
+              placeholder="Your full name"
               className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               {...register("fullName")}
             />
@@ -212,7 +274,7 @@ export function RegistrationForm() {
             <Input
               id="email"
               type="email"
-              placeholder="your.email@example.com"
+              placeholder="name@company.com"
               className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               {...register("email")}
             />
@@ -306,6 +368,13 @@ export function RegistrationForm() {
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">Address <span className="text-red-500">*</span></h3>
 
+        {addressError && (
+          <Alert variant="destructive" className="border-red-300 bg-red-50">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-red-800">{addressError}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Region Dropdown */}
           <div className="space-y-2">
@@ -318,12 +387,15 @@ export function RegistrationForm() {
                 id="region"
                 {...register("region")}
                 onChange={handleRegionChange}
-                className="pl-10 pr-4 h-11 w-full border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900"
+                disabled={loadingRegions}
+                className="pl-10 pr-4 h-11 w-full border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select Region</option>
+                <option value="">
+                  {loadingRegions ? "Loading regions..." : "Select Region"}
+                </option>
                 {regions.map((region) => (
                   <option key={region.code} value={region.code}>
-                    {region.name}
+                    {region.regionName || region.name}
                   </option>
                 ))}
               </select>
@@ -344,12 +416,14 @@ export function RegistrationForm() {
                 id="province"
                 {...register("province")}
                 onChange={handleProvinceChange}
-                disabled={!selectedRegion}
+                disabled={!selectedRegion || loadingProvinces}
                 className="pl-10 pr-4 h-11 w-full border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select Province</option>
+                <option value="">
+                  {loadingProvinces ? "Loading provinces..." : "Select Province"}
+                </option>
                 {provinces.map((province) => (
-                  <option key={province.name} value={province.name}>
+                  <option key={province.code} value={province.code}>
                     {province.name}
                   </option>
                 ))}
@@ -371,12 +445,14 @@ export function RegistrationForm() {
                 id="city"
                 {...register("city")}
                 onChange={handleCityChange}
-                disabled={!selectedProvince}
+                disabled={!selectedProvince || loadingCities}
                 className="pl-10 pr-4 h-11 w-full border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select City</option>
+                <option value="">
+                  {loadingCities ? "Loading cities..." : "Select City"}
+                </option>
                 {cities.map((city) => (
-                  <option key={city.name} value={city.name}>
+                  <option key={city.code} value={city.code}>
                     {city.name}
                   </option>
                 ))}
@@ -397,12 +473,14 @@ export function RegistrationForm() {
               <select
                 id="barangay"
                 {...register("barangay")}
-                disabled={!selectedCity}
+                disabled={!selectedCity || loadingBarangays}
                 className="pl-10 pr-4 h-11 w-full border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
               >
-                <option value="">Select Barangay</option>
+                <option value="">
+                  {loadingBarangays ? "Loading barangays..." : "Select Barangay"}
+                </option>
                 {barangays.map((barangay) => (
-                  <option key={barangay.name} value={barangay.name}>
+                  <option key={barangay.code} value={barangay.code}>
                     {barangay.name}
                   </option>
                 ))}
