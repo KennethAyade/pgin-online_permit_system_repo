@@ -112,36 +112,38 @@ export function AdminDashboard() {
 
   return (
     <Tabs defaultValue="overview" className="space-y-6">
-      <TabsList className="bg-white border border-gray-200 p-1">
-        <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <FileText className="h-4 w-4 mr-2" />
-          Overview
+      <TabsList className="bg-white border border-gray-200 p-1 w-full justify-start">
+        <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white text-xs sm:text-sm">
+          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Overview</span>
+          <span className="sm:hidden">Info</span>
         </TabsTrigger>
-        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <CheckSquare className="h-4 w-4 mr-2" />
-          Acceptance Requirements Queue
+        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white text-xs sm:text-sm whitespace-nowrap">
+          <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden lg:inline">Acceptance Requirements Queue</span>
+          <span className="lg:hidden">Accept. Queue</span>
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-6">
       {/* Statistics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {statCards.map((stat) => {
           const Icon = stat.icon
           return (
             <Card key={stat.label} className={`border-2 ${stat.borderColor} shadow-sm hover:shadow-md transition-shadow`}>
-              <CardHeader className="pb-3">
+              <CardHeader className="pb-2 sm:pb-3 p-3 sm:p-6">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                  <CardTitle className="text-[10px] sm:text-xs font-medium text-gray-600 uppercase tracking-wide leading-tight">
                     {stat.label}
                   </CardTitle>
-                  <div className={`${stat.bgColor} p-2 rounded-lg`}>
-                    <Icon className={`h-4 w-4 ${stat.textColor}`} />
+                  <div className={`${stat.bgColor} p-1.5 sm:p-2 rounded-lg`}>
+                    <Icon className={`h-3 w-3 sm:h-4 sm:w-4 ${stat.textColor}`} />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className={`text-3xl font-bold ${stat.textColor}`}>
+              <CardContent className="p-3 sm:p-6 pt-0">
+                <div className={`text-2xl sm:text-3xl font-bold ${stat.textColor}`}>
                   {stat.value}
                 </div>
               </CardContent>

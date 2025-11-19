@@ -3,7 +3,8 @@
     "allow": [
       "Bash(findstr:*)",
       "Bash(dir:*)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(npx shadcn@latest add:*)"
     ],
     "deny": [],
     "ask": []

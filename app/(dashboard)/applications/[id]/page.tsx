@@ -55,19 +55,20 @@ export default function ApplicationDetailPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-lg p-6 shadow-lg">
-        <div className="flex items-center gap-4">
+      <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-lg p-4 sm:p-5 lg:p-6 shadow-lg">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
           <Button
             variant="ghost"
             onClick={() => router.back()}
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-white/20 -ml-2 sm:ml-0"
+            size="sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold mb-1">Application Details</h1>
-            <p className="text-blue-100">
+            <h1 className="text-xl sm:text-2xl font-bold mb-1">Application Details</h1>
+            <p className="text-sm sm:text-base text-blue-100">
               Application Number: {application.applicationNo}
             </p>
           </div>

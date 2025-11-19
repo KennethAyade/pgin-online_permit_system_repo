@@ -195,13 +195,14 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   return (
     <div className="max-w-4xl mx-auto">
       <Card className="shadow-lg border-gray-200">
-        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <CardTitle className="text-2xl font-bold text-gray-900">New Permit Application</CardTitle>
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900">New Permit Application</CardTitle>
             {isSaving && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Save className="h-4 w-4 animate-pulse" />
-                <span>Saving draft...</span>
+                <span className="hidden sm:inline">Saving draft...</span>
+                <span className="sm:hidden">Saving...</span>
               </div>
             )}
           </div>
@@ -213,33 +214,33 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
             <Progress value={progress} className="h-2" />
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 sm:p-6 pt-6">
           {renderStep()}
 
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-6 border-t border-gray-200">
             <Button
               variant="outline"
               onClick={handlePrevious}
               disabled={currentStep === 1}
-              className="border-gray-300"
+              className="w-full sm:w-auto border-gray-300"
             >
               <ChevronLeft className="h-4 w-4 mr-2" />
               Previous
             </Button>
 
             {currentStep < totalSteps ? (
-              <Button 
+              <Button
                 onClick={handleNext}
-                className="bg-blue-700 hover:bg-blue-800 text-white"
+                className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white"
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button 
-                onClick={handleSubmit} 
+              <Button
+                onClick={handleSubmit}
                 disabled={!applicationIdState}
-                className="bg-green-700 hover:bg-green-800 text-white"
+                className="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white"
               >
                 Submit Application
               </Button>

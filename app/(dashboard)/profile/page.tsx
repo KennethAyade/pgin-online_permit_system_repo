@@ -54,14 +54,14 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-lg p-6 shadow-lg">
-        <div className="flex items-center gap-4">
-          <div className="bg-white/20 p-3 rounded-lg">
-            <User className="h-8 w-8" />
+      <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-lg p-4 sm:p-5 lg:p-6 shadow-lg">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="bg-white/20 p-2 sm:p-3 rounded-lg">
+            <User className="h-6 w-6 sm:h-8 sm:w-8" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold mb-2">Profile</h1>
-            <p className="text-blue-100">Manage your account settings</p>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Profile</h1>
+            <p className="text-sm sm:text-base text-blue-100">Manage your account settings</p>
           </div>
         </div>
       </div>

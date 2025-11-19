@@ -61,30 +61,36 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
 
   return (
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="bg-white border border-gray-200 p-1">
-        <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <FileText className="h-4 w-4 mr-2" />
-          Overview
+      <TabsList className="bg-white border border-gray-200 p-1 w-full overflow-x-auto flex-nowrap justify-start">
+        <TabsTrigger value="overview" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Overview</span>
+          <span className="sm:hidden">Info</span>
         </TabsTrigger>
-        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <CheckSquare className="h-4 w-4 mr-2" />
-          Acceptance Requirements
+        <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden lg:inline">Acceptance Requirements</span>
+          <span className="lg:hidden">Accept.</span>
         </TabsTrigger>
-        <TabsTrigger value="documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <FileText className="h-4 w-4 mr-2" />
-          Documents
+        <TabsTrigger value="documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Documents</span>
+          <span className="sm:hidden">Docs</span>
         </TabsTrigger>
-        <TabsTrigger value="status" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <History className="h-4 w-4 mr-2" />
-          Status History
+        <TabsTrigger value="status" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <History className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Status History</span>
+          <span className="sm:hidden">Status</span>
         </TabsTrigger>
-        <TabsTrigger value="evaluations" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <ClipboardCheck className="h-4 w-4 mr-2" />
-          Evaluations
+        <TabsTrigger value="evaluations" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <ClipboardCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Evaluations</span>
+          <span className="sm:hidden">Eval.</span>
         </TabsTrigger>
-        <TabsTrigger value="comments" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Comments
+        <TabsTrigger value="comments" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+          <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Comments</span>
+          <span className="sm:hidden">Comm.</span>
         </TabsTrigger>
       </TabsList>
 
@@ -116,7 +122,7 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
             <CardTitle className="text-lg font-semibold text-gray-900">Application Information</CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Application Number</p>
                 <p className="text-sm font-semibold text-gray-900">{application.applicationNo}</p>
