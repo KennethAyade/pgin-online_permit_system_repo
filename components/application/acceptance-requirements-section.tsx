@@ -78,6 +78,24 @@ export function AcceptanceRequirementsSection({
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
+  // Coordinates state for 4 points
+  const [coordinates, setCoordinates] = useState({
+    point1: { latitude: "", longitude: "" },
+    point2: { latitude: "", longitude: "" },
+    point3: { latitude: "", longitude: "" },
+    point4: { latitude: "", longitude: "" },
+  })
+
+  const updateCoordinate = (point: string, field: string, value: string) => {
+    setCoordinates(prev => ({
+      ...prev,
+      [point]: {
+        ...prev[point as keyof typeof prev],
+        [field]: value
+      }
+    }))
+  }
+
   useEffect(() => {
     fetchRequirements()
   }, [applicationId])
@@ -116,10 +134,35 @@ export function AcceptanceRequirementsSection({
       return
     }
 
-    // For PROJECT_COORDINATES, require submittedData
-    if (selectedRequirement.requirementType === "PROJECT_COORDINATES" && !submissionData) {
-      setError("Please enter the project coordinates")
-      return
+    // For PROJECT_COORDINATES, validate all 4 points
+    if (selectedRequirement.requirementType === "PROJECT_COORDINATES") {
+      const points = [coordinates.point1, coordinates.point2, coordinates.point3, coordinates.point4]
+      const hasEmptyFields = points.some(p => !p.latitude.trim() || !p.longitude.trim())
+
+      if (hasEmptyFields) {
+        setError("Please enter all 4 coordinate points (latitude and longitude)")
+        return
+      }
+
+      // Validate coordinate format (simple numeric check)
+      const isValidCoordinate = (value: string) => {
+        const num = parseFloat(value)
+        return !isNaN(num)
+      }
+
+      const hasInvalidFormat = points.some(p => !isValidCoordinate(p.latitude) || !isValidCoordinate(p.longitude))
+      if (hasInvalidFormat) {
+        setError("Please enter valid numeric coordinates")
+        return
+      }
+
+      // Format coordinates as JSON for submission
+      setSubmissionData(JSON.stringify({
+        point1: { latitude: parseFloat(coordinates.point1.latitude), longitude: parseFloat(coordinates.point1.longitude) },
+        point2: { latitude: parseFloat(coordinates.point2.latitude), longitude: parseFloat(coordinates.point2.longitude) },
+        point3: { latitude: parseFloat(coordinates.point3.latitude), longitude: parseFloat(coordinates.point3.longitude) },
+        point4: { latitude: parseFloat(coordinates.point4.latitude), longitude: parseFloat(coordinates.point4.longitude) },
+      }))
     }
 
     // For other documents, require file
@@ -173,6 +216,13 @@ export function AcceptanceRequirementsSection({
       setSuccess(`${selectedRequirement.requirementName} submitted successfully!`)
       setSubmissionData("")
       setSubmissionFile(null)
+      // Reset coordinates
+      setCoordinates({
+        point1: { latitude: "", longitude: "" },
+        point2: { latitude: "", longitude: "" },
+        point3: { latitude: "", longitude: "" },
+        point4: { latitude: "", longitude: "" },
+      })
       await fetchRequirements()
 
       // Reset selection after 2 seconds
@@ -319,18 +369,118 @@ export function AcceptanceRequirementsSection({
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {selectedRequirement.requirementType === "PROJECT_COORDINATES" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="coordinates">Project Coordinates (Latitude, Longitude)</Label>
-                  <Input
-                    id="coordinates"
-                    placeholder="e.g., 14.5995, 120.9842"
-                    value={submissionData}
-                    onChange={(e) => setSubmissionData(e.target.value)}
-                    disabled={submitting}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Enter your project location coordinates for verification
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Enter the 4 corner coordinates of your project area for verification
                   </p>
+
+                  {/* Point 1 */}
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">Point 1</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="point1-lat" className="text-xs text-gray-500">Latitude</Label>
+                        <Input
+                          id="point1-lat"
+                          placeholder="e.g., 14.5995"
+                          value={coordinates.point1.latitude}
+                          onChange={(e) => updateCoordinate("point1", "latitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="point1-lng" className="text-xs text-gray-500">Longitude</Label>
+                        <Input
+                          id="point1-lng"
+                          placeholder="e.g., 120.9842"
+                          value={coordinates.point1.longitude}
+                          onChange={(e) => updateCoordinate("point1", "longitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Point 2 */}
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">Point 2</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="point2-lat" className="text-xs text-gray-500">Latitude</Label>
+                        <Input
+                          id="point2-lat"
+                          placeholder="e.g., 14.5995"
+                          value={coordinates.point2.latitude}
+                          onChange={(e) => updateCoordinate("point2", "latitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="point2-lng" className="text-xs text-gray-500">Longitude</Label>
+                        <Input
+                          id="point2-lng"
+                          placeholder="e.g., 120.9842"
+                          value={coordinates.point2.longitude}
+                          onChange={(e) => updateCoordinate("point2", "longitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Point 3 */}
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">Point 3</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="point3-lat" className="text-xs text-gray-500">Latitude</Label>
+                        <Input
+                          id="point3-lat"
+                          placeholder="e.g., 14.5995"
+                          value={coordinates.point3.latitude}
+                          onChange={(e) => updateCoordinate("point3", "latitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="point3-lng" className="text-xs text-gray-500">Longitude</Label>
+                        <Input
+                          id="point3-lng"
+                          placeholder="e.g., 120.9842"
+                          value={coordinates.point3.longitude}
+                          onChange={(e) => updateCoordinate("point3", "longitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Point 4 */}
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <Label className="text-sm font-medium text-gray-700 mb-3 block">Point 4</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="point4-lat" className="text-xs text-gray-500">Latitude</Label>
+                        <Input
+                          id="point4-lat"
+                          placeholder="e.g., 14.5995"
+                          value={coordinates.point4.latitude}
+                          onChange={(e) => updateCoordinate("point4", "latitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="point4-lng" className="text-xs text-gray-500">Longitude</Label>
+                        <Input
+                          id="point4-lng"
+                          placeholder="e.g., 120.9842"
+                          value={coordinates.point4.longitude}
+                          onChange={(e) => updateCoordinate("point4", "longitude", e.target.value)}
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2">

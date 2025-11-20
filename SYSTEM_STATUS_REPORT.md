@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 1.3
-**Last Updated**: 2025-11-20
+**Document Version**: 1.4
+**Last Updated**: 2025-11-21
 **Status**: Production Ready (Pending Cron Job Configuration)
-**Latest Update**: Complete terminology refactoring (mandatory → acceptance), added Continue Application for drafts, admin file upload capability, full requirements display on permit selection
+**Latest Update**: 4-point coordinate input system for Project Coordinates requirement
 
 ---
 
@@ -119,7 +119,7 @@ Users create permit applications through a guided 7-step wizard:
 - Each requirement must be reviewed and accepted by admin before next one unlocks
 
 **ISAG Requirements (11 items - Sequential):**
-1. Project Coordinates (text input - latitude, longitude)
+1. Project Coordinates (4 points with separate Latitude/Longitude fields)
 2. Duly accomplished Application Form (MGB Form 8-4)
 3. Survey Plan (signed and sealed by deputized Geodetic Engineer)
 4. Location Map (NAMRIA Topographic Map 1:50,000)
@@ -132,7 +132,7 @@ Users create permit applications through a guided 7-step wizard:
 11. Other supporting papers required by MGB / PMRB
 
 **CSAG Requirements (10 items - Sequential):**
-1. Project Coordinates (text input - latitude, longitude)
+1. Project Coordinates (4 points with separate Latitude/Longitude fields)
 2. Duly accomplished Application Form (MGB Form 8-4)
 3. Survey Plan
 4. Location Map
@@ -175,7 +175,9 @@ After initial application submission, applications enter a **sequential acceptan
 The key feature of this system is that requirements are **NOT submitted all at once**. Each requirement follows this individual workflow:
 
 1. **First Requirement - Project Coordinates**
-   - Applicant submits project coordinates (latitude, longitude text input)
+   - Applicant submits 4 coordinate points defining the project area boundary
+   - Each point has separate Latitude and Longitude input fields
+   - Data stored as JSON with point1, point2, point3, point4 (each with lat/lng)
    - Status changes: PENDING_SUBMISSION → PENDING_REVIEW
    - Admin receives notification to review
 
@@ -235,7 +237,7 @@ When application is voided:
 #### Acceptance Requirements by Permit Type
 
 **ISAG (11 Requirements - Sequential):**
-1. Project Coordinates (text input: latitude, longitude)
+1. Project Coordinates (4 points with separate Latitude/Longitude fields)
 2. Duly accomplished Application Form (MGB Form 8-4)
 3. Survey Plan (signed and sealed by deputized Geodetic Engineer)
 4. Location Map (NAMRIA Topographic Map 1:50,000)
@@ -248,7 +250,7 @@ When application is voided:
 11. Other supporting papers required by MGB / PMRB
 
 **CSAG (10 Requirements - Sequential):**
-1. Project Coordinates (text input: latitude, longitude)
+1. Project Coordinates (4 points with separate Latitude/Longitude fields)
 2. Duly accomplished Application Form (MGB Form 8-4)
 3. Survey Plan
 4. Location Map
@@ -1234,6 +1236,26 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 1.4 (November 21, 2025)
+
+**4-Point Coordinate Input System:**
+- Project Coordinates requirement now uses 4 separate coordinate points
+- Each point has dedicated Latitude and Longitude input fields
+- Points define the boundary corners of the project area
+- Data validated for completeness and numeric format
+- Coordinates stored as JSON with point1, point2, point3, point4 structure
+
+**UI Updates:**
+- New responsive form layout for coordinate entry
+- Mobile-friendly grid design (1 column on mobile, 2 columns on tablet+)
+- Each point displayed in a bordered card with clear labeling
+- Placeholder text guides users on expected format
+
+**Files Modified:**
+- `components/application/acceptance-requirements-section.tsx` - Complete rewrite of coordinate input UI
+
+---
 
 ### Version 1.3 (November 20, 2025)
 
