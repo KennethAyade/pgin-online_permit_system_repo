@@ -17,9 +17,16 @@ export function StepPermitType({ data, onUpdate }: StepPermitTypeProps) {
       description: "Requires 5-year Work Program and EPEP",
       icon: Building2,
       requirements: [
-        "5-Year Work Program",
-        "EPEP (Environmental Protection and Enhancement Program)",
-        "Comprehensive documentation",
+        "Duly accomplished Application Form (MGB Form 8-4)",
+        "Survey Plan (signed and sealed by deputized Geodetic Engineer)",
+        "Location Map (NAMRIA Topographic Map 1:50,000)",
+        "Five-Year Work Program (MGB Form 6-2)",
+        "Initial Environmental Examination (IEE) Report",
+        "Certificate of Environmental Management and Community Relations Record",
+        "Proof of Technical Competence (CVs, licenses, track records)",
+        "Proof of Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)",
+        "Articles of Incorporation/Partnership (SEC Certified, if applicable)",
+        "Other supporting papers required by MGB/PMRB",
       ],
       color: "blue",
     },
@@ -29,8 +36,15 @@ export function StepPermitType({ data, onUpdate }: StepPermitTypeProps) {
       description: "Requires 1-year Work Program",
       icon: Users,
       requirements: [
-        "1-Year Work Program",
-        "Simplified documentation",
+        "Duly accomplished Application Form (MGB Form 8-4)",
+        "Survey Plan",
+        "Location Map",
+        "One-Year Work Program (MGB Form 6-2)",
+        "Initial Environmental Examination (IEE) Report",
+        "Proof of Technical Competence (CVs, licenses, track records)",
+        "Proof of Technical and Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)",
+        "Articles of Incorporation/Partnership (SEC Certified, if applicable)",
+        "Other supporting papers required by MGB/PMRB",
       ],
       color: "green",
     },
@@ -62,21 +76,22 @@ export function StepPermitType({ data, onUpdate }: StepPermitTypeProps) {
             >
               <CardHeader>
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={cn(
-                      "p-3 rounded-lg",
+                      "p-3 rounded-lg flex-shrink-0",
                       isSelected ? "bg-blue-700 text-white" : "bg-gray-100 text-gray-700"
                     )}>
                       <Icon className="h-6 w-6" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <CardTitle className="text-lg font-bold text-gray-900">{type.label}</CardTitle>
                       <CardDescription className="mt-1 text-gray-600">{type.description}</CardDescription>
                     </div>
                   </div>
-                  {isSelected && (
-                    <CheckCircle2 className="h-6 w-6 text-blue-700 flex-shrink-0" />
-                  )}
+                  <CheckCircle2 className={cn(
+                    "h-6 w-6 flex-shrink-0 ml-2",
+                    isSelected ? "text-blue-700" : "text-transparent"
+                  )} />
                 </div>
               </CardHeader>
               <CardContent>

@@ -4,7 +4,9 @@
       "Bash(findstr:*)",
       "Bash(dir:*)",
       "Bash(nul)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(git mv:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

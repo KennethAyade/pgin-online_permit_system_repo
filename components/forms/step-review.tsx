@@ -55,8 +55,8 @@ export function StepReview({ applicationId, data, onSubmit }: StepReviewProps) {
 
   const checkCompleteness = (app: any) => {
     const requirements = app.permitType === "ISAG"
-      ? DOCUMENT_REQUIREMENTS.ISAG.mandatory
-      : DOCUMENT_REQUIREMENTS.CSAG.mandatory
+      ? DOCUMENT_REQUIREMENTS.ISAG.acceptance
+      : DOCUMENT_REQUIREMENTS.CSAG.acceptance
 
     const uploadedDocTypes = app.documents?.map((doc: any) => doc.documentType) || []
     const missing = requirements.filter(

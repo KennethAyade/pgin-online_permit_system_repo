@@ -9,14 +9,14 @@ export const APPLICATION_STEPS = {
   PROJECT_INFO: 2,
   PROPONENT_INFO: 3,
   PROJECT_DETAILS: 4,
-  MANDATORY_DOCS: 5,
+  ACCEPTANCE_DOCS: 5,
   OTHER_REQUIREMENTS: 6,
   REVIEW: 7,
 } as const
 
 export const DOCUMENT_REQUIREMENTS = {
   ISAG: {
-    mandatory: [
+    acceptance: [
       'APPLICATION_FORM',
       'SURVEY_PLAN',
       'LOCATION_MAP',
@@ -46,7 +46,7 @@ export const DOCUMENT_REQUIREMENTS = {
     ],
   },
   CSAG: {
-    mandatory: [
+    acceptance: [
       'APPLICATION_FORM',
       'SURVEY_PLAN',
       'LOCATION_MAP',

@@ -9,7 +9,7 @@ import { StepPermitType } from "./step-permit-type"
 import { StepProjectInfo } from "./step-project-info"
 import { StepProponentInfo } from "./step-proponent-info"
 import { StepProjectDetails } from "./step-project-details"
-import { StepMandatoryDocs } from "./step-mandatory-docs"
+import { StepAcceptanceDocs } from "./step-acceptance-docs"
 import { StepOtherRequirements } from "./step-other-requirements"
 import { StepReview } from "./step-review"
 import { APPLICATION_STEPS } from "@/lib/constants"
@@ -23,13 +23,23 @@ interface ApplicationWizardProps {
 
 export function ApplicationWizard({ applicationId, initialData }: ApplicationWizardProps) {
   const router = useRouter()
-  const [currentStep, setCurrentStep] = useState(1)
+  const [currentStep, setCurrentStep] = useState(initialData?.currentStep || 1)
   const [formData, setFormData] = useState<any>(initialData || {})
   const [isSaving, setIsSaving] = useState(false)
   const [applicationIdState, setApplicationIdState] = useState<string | undefined>(applicationId)
 
   const totalSteps = 7
   const progress = (currentStep / totalSteps) * 100
+
+  // Initialize form data from initialData when it changes
+  useEffect(() => {
+    if (initialData) {
+      setFormData(initialData)
+      if (initialData.currentStep) {
+        setCurrentStep(initialData.currentStep)
+      }
+    }
+  }, [initialData])
 
   // Auto-save draft when form data changes
   useEffect(() => {
@@ -162,9 +172,9 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
             onUpdate={updateFormData}
           />
         )
-      case APPLICATION_STEPS.MANDATORY_DOCS:
+      case APPLICATION_STEPS.ACCEPTANCE_DOCS:
         return (
-          <StepMandatoryDocs
+          <StepAcceptanceDocs
             applicationId={applicationIdState}
             permitType={formData.permitType}
             data={formData}

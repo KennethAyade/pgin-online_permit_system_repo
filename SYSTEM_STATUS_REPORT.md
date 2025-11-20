@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 1.1
-**Last Updated**: 2025-11-19
+**Document Version**: 1.3
+**Last Updated**: 2025-11-20
 **Status**: Production Ready (Pending Cron Job Configuration)
-**Latest Update**: Complete mobile optimization across all pages
+**Latest Update**: Complete terminology refactoring (mandatory → acceptance), added Continue Application for drafts, admin file upload capability, full requirements display on permit selection
 
 ---
 
@@ -97,7 +97,7 @@ Users create permit applications through a guided 7-step wizard:
 
 **Step 1: Permit Type Selection**
 - Choose between ISAG (Industrial) or CSAG (Commercial)
-- View requirements preview
+- View **complete requirements list** for each permit type (all 10-11 requirements displayed)
 
 **Step 2: Project Information**
 - Enter project name
@@ -114,32 +114,53 @@ Users create permit applications through a guided 7-step wizard:
 - Additional project specifics
 - Location details
 
-**Step 5: Mandatory Documents Upload**
-- Upload required documents (PDF only, 10MB max each)
-- ISAG requires: Application Form, Survey Plan, Location Map, 5-Year Work Program, IEE Report, **EPEP**, Technical Competence, Financial Capability, Articles of Incorporation, Supporting Papers
-- CSAG requires: Same as ISAG except **no EPEP** and 1-Year Work Program
+**Step 5: Acceptance Requirements Upload**
+- Documents are submitted **one at a time** through sequential workflow (PDF only, 10MB max each)
+- Each requirement must be reviewed and accepted by admin before next one unlocks
 
-**Step 6: Other Requirements Upload**
-- Clearances (CENRO, MGB)
-- Certificates of Posting (6 locations)
-- Environmental Compliance Certificate (ECC)
-- Sanggunian Endorsements
-- Field Verification Report
-- Surety Bond (₱20,000)
+**ISAG Requirements (11 items - Sequential):**
+1. Project Coordinates (text input - latitude, longitude)
+2. Duly accomplished Application Form (MGB Form 8-4)
+3. Survey Plan (signed and sealed by deputized Geodetic Engineer)
+4. Location Map (NAMRIA Topographic Map 1:50,000)
+5. Five-Year Work Program (MGB Form 6-2)
+6. Initial Environmental Examination (IEE) Report
+7. Certificate of Environmental Management and Community Relations Record
+8. Proof of Technical Competence (CVs, licenses, track records)
+9. Proof of Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)
+10. Articles of Incorporation/Partnership (SEC Certified, if applicable)
+11. Other supporting papers required by MGB / PMRB
+
+**CSAG Requirements (10 items - Sequential):**
+1. Project Coordinates (text input - latitude, longitude)
+2. Duly accomplished Application Form (MGB Form 8-4)
+3. Survey Plan
+4. Location Map
+5. One-Year Work Program (MGB Form 6-2)
+6. Initial Environmental Examination (IEE) Report
+7. Proof of Technical Competence (CVs, licenses, track records)
+8. Proof of Technical and Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)
+9. Articles of Incorporation/Partnership (SEC Certified, if applicable)
+10. Other supporting papers required by MGB / PMRB
+
+**Step 6: Other Requirements**
+- Additional clearances and documents as required
 
 **Step 7: Review & Submit**
 - Review all information
 - Document checklist verification
 - Submit application
 
-**Key Feature: Auto-Save**
+**Key Feature: Auto-Save & Resume**
 - All progress automatically saved as draft every 2 seconds
 - Users can return to incomplete applications anytime
 - Multiple draft applications supported
+- **"Continue Application" button** on draft application details page
+- Wizard resumes at the exact step where user left off
 
-### 3. ACCEPTANCE REQUIREMENTS WORKFLOW ⭐ (New Feature)
+### 3. ACCEPTANCE REQUIREMENTS WORKFLOW ⭐ (Core Feature)
 
-After initial submission, applications enter a **sequential acceptance requirements phase**:
+After initial application submission, applications enter a **sequential acceptance requirements phase** where each document/data is submitted and reviewed one at a time:
 
 #### How It Works
 
@@ -147,53 +168,96 @@ After initial submission, applications enter a **sequential acceptance requireme
 - Admin initializes acceptance requirements for the application
 - Creates 11 requirements for ISAG or 10 for CSAG
 - All requirements start as "PENDING_SUBMISSION"
-- Only the first requirement is unlocked
+- Only the first requirement (Project Coordinates) is unlocked
 
-**Sequential Submission (One at a Time):**
-1. User can only submit **Requirement #1** initially
-2. User submits requirement (text data or file upload)
-3. Status changes: PENDING_SUBMISSION → PENDING_REVIEW
-4. Auto-accept deadline set: **10 days from submission**
-5. Requirements #2-11 remain **locked** until #1 is accepted
+**Sequential Submission Process (One at a Time):**
 
-**Admin Review:**
-- Admin sees requirement in the "Acceptance Requirements Queue"
-- Admin can:
-  - **Accept** → Requirement marked as ACCEPTED
-    - Next requirement automatically unlocks for user
-    - User notified to submit next requirement
-  - **Reject (Request Revision)** → Requirement marked as REVISION_REQUIRED
-    - Revision deadline set: **14 days from rejection**
-    - User can resubmit the same requirement
-    - Admin remarks displayed to user
+The key feature of this system is that requirements are **NOT submitted all at once**. Each requirement follows this individual workflow:
 
-**Automatic Enforcement:**
-- If admin doesn't review within **10 days**: Requirement **auto-accepts**
-- If user doesn't resubmit revision within **14 days**: Application **voided**
+1. **First Requirement - Project Coordinates**
+   - Applicant submits project coordinates (latitude, longitude text input)
+   - Status changes: PENDING_SUBMISSION → PENDING_REVIEW
+   - Admin receives notification to review
+
+2. **Admin Reviews Requirement**
+   - Admin checks if submitted data/document is valid
+   - Admin has **10 days** to review (auto-accepts if exceeded)
+   - Admin can provide remarks and upload supporting files
+
+3. **Accept or Reject**
+   - **If Accepted**:
+     - Applicant receives notification: "Your requirement has been accepted"
+     - Next requirement automatically unlocks
+     - Applicant can now submit Requirement #2 (Application Form)
+   - **If Rejected**:
+     - Admin enters remarks explaining why it was rejected
+     - Admin can attach a file (e.g., annotated document showing issues)
+     - Applicant receives notification with rejection reason
+     - Applicant has **14 days** to revise and resubmit
+     - If not resubmitted within 14 days: **Application automatically voided**
+
+4. **Repeat for Each Requirement**
+   - Same process continues for all 11 (ISAG) or 10 (CSAG) requirements
+   - Each requirement must be accepted before next one becomes available
+   - No skipping or batch submission allowed
+
+**Example Flow:**
+```
+Submit Coordinates → Admin Reviews → Accepts →
+Submit Application Form → Admin Reviews → Rejects (needs signature) →
+Applicant Revises → Resubmits → Admin Reviews → Accepts →
+Submit Survey Plan → ... and so on
+```
+
+**Admin Review Features:**
+- View submitted data/documents
+- Accept or reject with single click
+- **Remarks field**: Explain acceptance/rejection reasons
+- **File upload capability**: Attach supporting documents (e.g., annotated corrections)
+- All remarks visible to applicant
+
+**Automatic Enforcement (Deadline System):**
+
+| Scenario | Deadline | Automatic Action |
+|----------|----------|------------------|
+| Admin fails to review | 10 days from submission | Requirement **auto-accepts**, next unlocks |
+| Applicant fails to revise | 14 days from rejection | Application **voided**, cannot continue |
+
+When application is voided:
+- Applicant receives notification
+- Application marked as VOIDED status
+- Applicant must create a new application to restart
 
 **Completion:**
-- After all requirements accepted: Application moves to UNDER_REVIEW status
-- Enters standard evaluation phase
+- After ALL requirements accepted: Application moves to UNDER_REVIEW status
+- Enters standard evaluation phase (Initial Check, Technical Review, etc.)
 
-#### Requirements by Permit Type
+#### Acceptance Requirements by Permit Type
 
 **ISAG (11 Requirements - Sequential):**
 1. Project Coordinates (text input: latitude, longitude)
-2. Application Form (file upload)
-3. Survey Plan (file upload)
-4. Location Map (file upload)
-5. Five-Year Work Program (file upload)
-6. IEE Report (file upload)
-7. EPEP - Environmental Protection and Enhancement Program (file upload)
-8. Proof of Technical Competence (file upload)
-9. Proof of Financial Capability (file upload)
-10. Articles of Incorporation (file upload)
-11. Other Supporting Papers (file upload)
+2. Duly accomplished Application Form (MGB Form 8-4)
+3. Survey Plan (signed and sealed by deputized Geodetic Engineer)
+4. Location Map (NAMRIA Topographic Map 1:50,000)
+5. Five-Year Work Program (MGB Form 6-2)
+6. Initial Environmental Examination (IEE) Report
+7. Certificate of Environmental Management and Community Relations Record
+8. Proof of Technical Competence (CVs, licenses, track records)
+9. Proof of Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)
+10. Articles of Incorporation/Partnership (SEC Certified, if applicable)
+11. Other supporting papers required by MGB / PMRB
 
 **CSAG (10 Requirements - Sequential):**
-Same as ISAG except:
-- No EPEP requirement
-- One-Year Work Program instead of Five-Year
+1. Project Coordinates (text input: latitude, longitude)
+2. Duly accomplished Application Form (MGB Form 8-4)
+3. Survey Plan
+4. Location Map
+5. One-Year Work Program (MGB Form 6-2)
+6. Initial Environmental Examination (IEE) Report
+7. Proof of Technical Competence (CVs, licenses, track records)
+8. Proof of Technical and Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)
+9. Articles of Incorporation/Partnership (SEC Certified, if applicable)
+10. Other supporting papers required by MGB / PMRB
 
 ### 4. ADMIN EVALUATION PROCESS
 
@@ -1166,6 +1230,50 @@ These features were intentionally excluded from MVP:
 - Login not working → Verify email is verified
 - File upload fails → Check file size/type
 - Cron jobs not running → Verify CRON_SECRET and schedule
+
+---
+
+## VERSION HISTORY
+
+### Version 1.3 (November 20, 2025)
+
+**Terminology Refactoring:**
+- Changed all "mandatory requirements" terminology to "acceptance requirements" throughout codebase
+- Updated constants: `MANDATORY_DOCS` → `ACCEPTANCE_DOCS`
+- Renamed file: `step-mandatory-docs.tsx` → `step-acceptance-docs.tsx`
+
+**New Features:**
+- **Continue Application for Drafts**: Added "Continue Application" button on draft application details page
+- **Draft Resume**: Application wizard now resumes at the exact step where user left off
+- **Admin File Upload**: Admin can now attach files when reviewing acceptance requirements
+- **Full Requirements Display**: Permit type selection shows complete list of all requirements (not abbreviated)
+
+**UI Improvements:**
+- Fixed layout shift when selecting permit type (checkmark icon now always reserves space)
+- Updated all document labels with full descriptive names including details in parentheses
+
+**Files Modified:**
+- `lib/constants.ts` - Updated terminology
+- `components/forms/step-acceptance-docs.tsx` - Renamed and updated
+- `components/forms/application-wizard.tsx` - Added draft resume functionality
+- `components/forms/step-permit-type.tsx` - Full requirements list, fixed layout
+- `components/admin/acceptance-requirements-queue.tsx` - Added file upload capability
+- `app/(dashboard)/applications/[id]/page.tsx` - Added Continue Application button
+- `app/(dashboard)/applications/new/page.tsx` - Support loading existing drafts
+- `app/api/acceptanceRequirements/initialize/route.ts` - Updated requirement names
+
+### Version 1.2 (November 20, 2025)
+- Updated acceptance requirements workflow documentation
+- Complete ISAG/CSAG requirements lists with full details
+- Mobile-first responsive design optimization
+
+### Version 1.1 (November 20, 2025)
+- Added comprehensive mobile optimization for all 15 pages
+- Responsive breakpoints and adaptive layouts
+
+### Version 1.0 (November 2025)
+- Initial system release
+- Complete MVP functionality
 
 ---
 
