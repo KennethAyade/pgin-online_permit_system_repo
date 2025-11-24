@@ -49,7 +49,40 @@ export async function GET(
       )
     }
 
-    // Read file from storage
+    // Check if file is stored in Vercel Blob (URL starts with https://)
+    if (document.fileUrl.startsWith("https://")) {
+      // Redirect to blob URL or fetch and proxy
+      const inline = request.nextUrl.searchParams.get("inline") === "1"
+      
+      // Fetch the file from blob storage
+      try {
+        const response = await fetch(document.fileUrl)
+        if (!response.ok) {
+          return NextResponse.json(
+            { error: "File not found" },
+            { status: 404 }
+          )
+        }
+        
+        const fileBuffer = await response.arrayBuffer()
+        
+        return new NextResponse(fileBuffer, {
+          headers: {
+            "Content-Type": document.mimeType,
+            "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${document.fileName}"`,
+            "Content-Length": document.fileSize.toString(),
+          },
+        })
+      } catch (fetchError) {
+        console.error("Error fetching file from blob:", fetchError)
+        return NextResponse.json(
+          { error: "File not found" },
+          { status: 404 }
+        )
+      }
+    }
+    
+    // Fallback to local filesystem (development)
     const filePath = join(process.cwd(), document.fileUrl)
     
     try {
