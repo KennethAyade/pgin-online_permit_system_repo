@@ -114,7 +114,8 @@ export function StepAcceptanceDocs({
                 <DocumentUpload
                   applicationId={applicationId}
                   documentType={docType}
-                  onUploadComplete={() => handleUploadComplete(docType)}
+                  documentName={DOCUMENT_LABELS[docType] || docType}
+                  onUploadSuccess={() => handleUploadComplete(docType)}
                   existingDocument={documents.find((d) => d.documentType === docType)}
                 />
               </div>
