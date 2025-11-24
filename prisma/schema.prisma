@@ -216,7 +216,8 @@ model Application {
   footprintArea Decimal? @db.Decimal(15, 2)
   numEmployees Int?
   projectCost  Decimal? @db.Decimal(15, 2)
-  
+  projectCoordinates Json?  // 4-point coordinates {point1: {lat, lng}, point2: {lat, lng}, point3: {lat, lng}, point4: {lat, lng}}
+
   // Application Status
   status       ApplicationStatus @default(DRAFT)
   

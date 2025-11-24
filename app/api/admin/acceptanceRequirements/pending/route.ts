@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
           order: req.order,
           status: req.status,
           submittedAt: req.submittedAt,
+          submittedData: req.submittedData,
           submittedFileName: req.submittedFileName,
           autoAcceptDeadline: req.autoAcceptDeadline,
           daysUntilAutoAccept: req.autoAcceptDeadline

@@ -77,6 +77,9 @@ export async function PUT(
     if (data.projectCost !== undefined) {
       updateData.projectCost = parseFloat(data.projectCost)
     }
+    if (data.projectCoordinates !== undefined) {
+      updateData.projectCoordinates = data.projectCoordinates
+    }
 
     // Auto-save: update without changing status
     const application = await prisma.application.update({

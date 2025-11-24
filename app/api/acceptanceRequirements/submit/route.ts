@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { addWorkingDays } from "@/lib/utils"
+import { ADMIN_REVIEW_DEADLINE_DAYS } from "@/lib/constants"
 
 /**
  * Submit an acceptance requirement
@@ -84,8 +86,8 @@ export async function POST(request: NextRequest) {
         submittedFileName,
         submittedAt: new Date(),
         submittedBy: session.user.id,
-        // Set auto-accept deadline (10 days from now)
-        autoAcceptDeadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
+        // Set auto-accept deadline (14 working days from now)
+        autoAcceptDeadline: addWorkingDays(new Date(), ADMIN_REVIEW_DEADLINE_DAYS),
       },
     })
 

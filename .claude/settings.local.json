@@ -6,7 +6,8 @@
       "Bash(nul)",
       "Bash(npx shadcn@latest add:*)",
       "Bash(git mv:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx prisma generate)"
     ],
     "deny": [],
     "ask": []

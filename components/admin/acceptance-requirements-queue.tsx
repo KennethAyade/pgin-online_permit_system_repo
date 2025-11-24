@@ -29,6 +29,7 @@ interface RequirementItem {
   order: number
   status: string
   submittedAt?: string
+  submittedData?: string
   submittedFileName?: string
   autoAcceptDeadline?: string
   daysUntilAutoAccept?: number
@@ -37,6 +38,17 @@ interface RequirementItem {
     fullName: string
     email: string
   }
+}
+
+interface OverlapResult {
+  hasOverlap: boolean
+  overlappingProjects: Array<{
+    applicationId: string
+    applicationNo: string
+    projectName: string | null
+    permitType: string
+  }>
+  checkedAgainst: number
 }
 
 interface AdminAcceptanceRequirementsQueueProps {
@@ -66,10 +78,48 @@ export function AdminAcceptanceRequirementsQueue({
   const [skip, setSkip] = useState(0)
   const [take] = useState(10)
   const [total, setTotal] = useState(0)
+  const [overlapResult, setOverlapResult] = useState<OverlapResult | null>(null)
+  const [checkingOverlap, setCheckingOverlap] = useState(false)
 
   useEffect(() => {
     fetchRequirements()
   }, [skip, permitFilter])
+
+  // Check for coordinate overlaps when PROJECT_COORDINATES is selected
+  useEffect(() => {
+    const checkOverlap = async () => {
+      if (
+        selectedRequirement?.requirementType === "PROJECT_COORDINATES" &&
+        selectedRequirement.submittedData
+      ) {
+        setCheckingOverlap(true)
+        try {
+          const coordinates = JSON.parse(selectedRequirement.submittedData)
+          const response = await fetch("/api/admin/acceptanceRequirements/checkOverlap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              coordinates,
+              applicationId: selectedRequirement.applicationId,
+            }),
+          })
+
+          if (response.ok) {
+            const result = await response.json()
+            setOverlapResult(result)
+          }
+        } catch (err) {
+          console.error("Overlap check failed:", err)
+        } finally {
+          setCheckingOverlap(false)
+        }
+      } else {
+        setOverlapResult(null)
+      }
+    }
+
+    checkOverlap()
+  }, [selectedRequirement])
 
   const fetchRequirements = async () => {
     try {
@@ -369,6 +419,87 @@ export function AdminAcceptanceRequirementsQueue({
                 )}
               </div>
             </div>
+
+            {/* Project Coordinates Display */}
+            {selectedRequirement.requirementType === "PROJECT_COORDINATES" && selectedRequirement.submittedData && (
+              <div className="bg-white rounded-lg p-4 border">
+                <h4 className="font-semibold mb-3">Submitted Coordinates</h4>
+                {(() => {
+                  try {
+                    const coords = JSON.parse(selectedRequirement.submittedData)
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {["point1", "point2", "point3", "point4"].map((point, index) => (
+                          <div key={point} className="bg-gray-50 p-3 rounded border">
+                            <div className="font-medium text-sm text-gray-700 mb-1">
+                              Point {index + 1}
+                            </div>
+                            <div className="text-xs space-y-1">
+                              <div>
+                                <span className="text-gray-500">Lat:</span>{" "}
+                                <span className="font-mono">{coords[point]?.latitude}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Lng:</span>{" "}
+                                <span className="font-mono">{coords[point]?.longitude}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  } catch {
+                    return <p className="text-red-600 text-sm">Failed to parse coordinates</p>
+                  }
+                })()}
+              </div>
+            )}
+
+            {/* Overlap Check Results */}
+            {selectedRequirement.requirementType === "PROJECT_COORDINATES" && (
+              <div className="space-y-2">
+                {checkingOverlap && (
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      Checking for overlaps with existing projects...
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {overlapResult && !checkingOverlap && (
+                  <>
+                    {overlapResult.hasOverlap ? (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          <div className="font-semibold mb-2">
+                            WARNING: Coordinates overlap with {overlapResult.overlappingProjects.length} existing project(s)
+                          </div>
+                          <ul className="list-disc list-inside text-sm space-y-1">
+                            {overlapResult.overlappingProjects.map((project) => (
+                              <li key={project.applicationId}>
+                                {project.applicationNo} - {project.projectName || "Unnamed"} ({project.permitType})
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="mt-2 text-sm">
+                            Please reject this requirement and ask the applicant to verify their project boundaries.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Alert className="bg-green-50 border-green-200">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                          No overlaps detected. Checked against {overlapResult.checkedAgainst} existing project(s).
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Admin Remarks */}
             <div className="space-y-2">

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { addWorkingDays } from "@/lib/utils"
+import { REVISION_DEADLINE_DAYS } from "@/lib/constants"
 
 /**
  * Admin review of acceptance requirement - Accept or Reject
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
       )
     } else {
       // REJECT the requirement
-      const revisionDeadline = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
+      const revisionDeadline = addWorkingDays(new Date(), REVISION_DEADLINE_DAYS) // 14 working days
 
       const updatedRequirement = await prisma.acceptanceRequirement.update({
         where: { id: requirementId },

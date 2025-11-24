@@ -4,6 +4,10 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB in bytes
 export const ALLOWED_FILE_TYPES = ['application/pdf']
 export const SESSION_TIMEOUT = 30 * 60 * 1000 // 30 minutes in milliseconds
 
+// Acceptance Requirements Deadlines (in working days)
+export const ADMIN_REVIEW_DEADLINE_DAYS = 14 // Admin must review within 14 working days
+export const REVISION_DEADLINE_DAYS = 14 // Applicant must resubmit within 14 working days
+
 export const APPLICATION_STEPS = {
   PERMIT_TYPE: 1,
   PROJECT_INFO: 2,
