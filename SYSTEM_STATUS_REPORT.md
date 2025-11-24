@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 1.4
-**Last Updated**: 2025-11-21
+**Document Version**: 1.5
+**Last Updated**: 2025-11-24
 **Status**: Production Ready (Pending Cron Job Configuration)
-**Latest Update**: 4-point coordinate input system for Project Coordinates requirement
+**Latest Update**: Coordinate-first workflow with 14 working days deadlines and overlap checking
 
 ---
 
@@ -114,9 +114,12 @@ Users create permit applications through a guided 7-step wizard:
 - Additional project specifics
 - Location details
 
-**Step 5: Acceptance Requirements Upload**
-- Documents are submitted **one at a time** through sequential workflow (PDF only, 10MB max each)
-- Each requirement must be reviewed and accepted by admin before next one unlocks
+**Step 5: Project Coordinates Submission**
+- **Coordinate-First Workflow**: Only Project Coordinates are submitted in this step
+- Enter 4 boundary points with separate Latitude/Longitude fields
+- Document uploads are **locked** until coordinates are approved by admin
+- After submission, applicant sees preview of upcoming document requirements
+- Remaining documents submitted through Acceptance Requirements section after approval
 
 **ISAG Requirements (11 items - Sequential):**
 1. Project Coordinates (4 points with separate Latitude/Longitude fields)
@@ -183,8 +186,9 @@ The key feature of this system is that requirements are **NOT submitted all at o
 
 2. **Admin Reviews Requirement**
    - Admin checks if submitted data/document is valid
-   - Admin has **10 days** to review (auto-accepts if exceeded)
+   - Admin has **14 working days** to review (auto-accepts if exceeded)
    - Admin can provide remarks and upload supporting files
+   - For coordinates: Admin checks for **overlap with existing approved projects**
 
 3. **Accept or Reject**
    - **If Accepted**:
@@ -195,8 +199,8 @@ The key feature of this system is that requirements are **NOT submitted all at o
      - Admin enters remarks explaining why it was rejected
      - Admin can attach a file (e.g., annotated document showing issues)
      - Applicant receives notification with rejection reason
-     - Applicant has **14 days** to revise and resubmit
-     - If not resubmitted within 14 days: **Application automatically voided**
+     - Applicant has **14 working days** to revise and resubmit
+     - If not resubmitted within 14 working days: **Application automatically voided**
 
 4. **Repeat for Each Requirement**
    - Same process continues for all 11 (ISAG) or 10 (CSAG) requirements
@@ -222,8 +226,13 @@ Submit Survey Plan → ... and so on
 
 | Scenario | Deadline | Automatic Action |
 |----------|----------|------------------|
-| Admin fails to review | 10 days from submission | Requirement **auto-accepts**, next unlocks |
-| Applicant fails to revise | 14 days from rejection | Application **voided**, cannot continue |
+| Admin fails to review | 14 working days from submission | Requirement **auto-accepts**, next unlocks |
+| Applicant fails to revise | 14 working days from rejection | Application **voided**, cannot continue |
+
+**Working Days Calculation:**
+- Working days exclude Saturdays and Sundays
+- Deadlines calculated from submission/rejection date
+- Example: Submitted on Friday → 14 working days = 3 weeks later (Friday)
 
 When application is voided:
 - Applicant receives notification
@@ -454,9 +463,9 @@ FOR_FINAL_APPROVAL
 **Purpose:** Prevent requirements from being stuck in review indefinitely
 
 **How it works:**
-- When user submits a requirement: Auto-accept deadline set to **10 days from now**
+- When user submits a requirement: Auto-accept deadline set to **14 working days from now**
 - Daily cron job checks for expired deadlines
-- If admin hasn't reviewed within 10 days: Requirement **automatically accepted**
+- If admin hasn't reviewed within 14 working days: Requirement **automatically accepted**
 - System marks requirement as "isAutoAccepted = true"
 - Next requirement unlocks automatically
 - User receives notification: "Your requirement was automatically accepted due to admin evaluation timeout"
@@ -471,9 +480,9 @@ FOR_FINAL_APPROVAL
 **Purpose:** Enforce timely resubmission of rejected requirements
 
 **How it works:**
-- When admin rejects requirement: Revision deadline set to **14 days from now**
+- When admin rejects requirement: Revision deadline set to **14 working days from now**
 - Daily cron job checks for expired revision deadlines
-- If user doesn't resubmit within 14 days: Entire application **voided**
+- If user doesn't resubmit within 14 working days: Entire application **voided**
 - Application status changed to VOIDED
 - Requirement marked as "isVoided = true"
 - User receives notification: "Your application has been voided due to expiration of revision deadline"
@@ -513,7 +522,7 @@ FOR_FINAL_APPROVAL
 
 ## API ARCHITECTURE
 
-### Total API Routes: 31
+### Total API Routes: 32
 
 **Authentication (1)**
 - `POST /api/auth/[...nextauth]` - NextAuth handler
@@ -559,9 +568,10 @@ FOR_FINAL_APPROVAL
 - `POST /api/admin/applications/[id]/return` - Return for revision
 - `GET /api/admin/dashboard` - Dashboard statistics
 
-**Admin - Acceptance Requirements (2)** ⭐
+**Admin - Acceptance Requirements (3)** ⭐
 - `GET /api/admin/acceptanceRequirements/pending` - List pending (paginated)
 - `POST /api/admin/acceptanceRequirements/review` - Accept/Reject requirement
+- `POST /api/admin/acceptanceRequirements/checkOverlap` - Check coordinate overlap with existing projects
 
 **Admin - Users (1)**
 - `GET /api/admin/users` - List all users
@@ -866,17 +876,30 @@ Unlike traditional permit systems where users submit all documents at once, this
 
 ### 2. Automated Deadline Management
 
-**10-Day Auto-Accept:**
+**14 Working Days Auto-Accept:**
 - Ensures admin reviews don't create bottlenecks
 - Requirements auto-accept if admin is unavailable
 - Maintains application flow
+- Excludes weekends from deadline calculation
 
-**14-Day Revision Enforcement:**
+**14 Working Days Revision Enforcement:**
 - Prevents indefinite pending applications
 - Forces timely resubmissions
 - Automatically voids non-compliant applications
+- Working days calculation for fair deadlines
 
-### 3. Cascading Philippine Address System
+### 3. Coordinate Overlap Checking ⭐
+
+**Purpose:** Prevent multiple projects from occupying the same area
+
+**How it works:**
+- Admin reviews submitted project coordinates
+- System checks for overlap with existing approved projects
+- Uses polygon intersection algorithm (point-in-polygon + line segment intersection)
+- Displays warning if overlap detected with project details
+- Helps prevent territorial conflicts between permit holders
+
+### 4. Cascading Philippine Address System
 
 Complete implementation of Philippine administrative divisions:
 - 17 Regions
@@ -885,14 +908,14 @@ Complete implementation of Philippine administrative divisions:
 - All Barangays
 - Dynamic dropdown population based on parent selection
 
-### 4. Dual Role System
+### 5. Dual Role System
 
 Single codebase serves both:
 - **Applicants**: Public users submitting permits
 - **Administrators**: Government staff reviewing applications
 - Detected via email domain or admin_users table
 
-### 5. Complete Audit Trail
+### 6. Complete Audit Trail
 
 Every action tracked:
 - Status changes with timestamps
@@ -901,7 +924,7 @@ Every action tracked:
 - When actions occurred
 - Complete transparency and accountability
 
-### 6. Professional Government UI
+### 7. Professional Government UI
 
 Designed specifically for government use:
 - Blue-700 primary color scheme (updated from blue-900 for better contrast)
@@ -910,7 +933,7 @@ Designed specifically for government use:
 - Accessible components
 - Fully responsive design optimized for all devices
 
-### 7. Mobile-First Responsive Design ⭐
+### 8. Mobile-First Responsive Design ⭐
 
 **Complete Mobile Optimization (November 2025)**
 
@@ -1236,6 +1259,56 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 1.5 (November 24, 2025)
+
+**Coordinate-First Sequential Workflow:**
+- Step 5 of application wizard now shows ONLY Project Coordinates input
+- Document uploads are **locked** until coordinates are approved by admin
+- Applicant sees preview list of upcoming document requirements
+- Implements true sequential workflow: coordinates → approval → documents
+
+**14 Working Days Deadline System:**
+- Updated all deadlines from calendar days to **working days** (excludes Saturdays/Sundays)
+- Admin review deadline: 14 working days (was 10 calendar days)
+- Applicant revision deadline: 14 working days (was 14 calendar days)
+- Added `addWorkingDays()` and `isWorkingDay()` utility functions in `lib/utils.ts`
+- Added deadline constants in `lib/constants.ts`
+
+**Coordinate Overlap Checking:**
+- New API endpoint: `POST /api/admin/acceptanceRequirements/checkOverlap`
+- Validates submitted coordinates against existing approved projects
+- Uses polygon intersection algorithm (point-in-polygon + line segment intersection)
+- Admin sees overlap warnings/success messages when reviewing coordinates
+- Helps prevent territorial conflicts between permit holders
+
+**Admin Queue Enhancements:**
+- Displays coordinate values in a grid format when reviewing PROJECT_COORDINATES
+- Shows 4 points with latitude/longitude for each
+- Automatically checks for overlaps when coordinate requirement is selected
+- Visual alerts for overlap warnings or confirmation of no conflicts
+
+**Database Schema Update:**
+- Added `projectCoordinates` JSON field to Application model
+- Stores coordinates as `{point1: {latitude, longitude}, point2: {...}, ...}`
+- Coordinates saved during draft phase via `/api/applications/[id]/draft`
+
+**Files Created:**
+- `app/api/admin/acceptanceRequirements/checkOverlap/route.ts` - Overlap checking API
+
+**Files Modified:**
+- `lib/utils.ts` - Working days utility functions
+- `lib/constants.ts` - Deadline constants (ADMIN_REVIEW_DEADLINE_DAYS, REVISION_DEADLINE_DAYS)
+- `lib/validations/application.ts` - Project coordinates schema
+- `prisma/schema.prisma` - Added projectCoordinates field
+- `app/api/acceptanceRequirements/submit/route.ts` - 14 working days deadline
+- `app/api/admin/acceptanceRequirements/review/route.ts` - 14 working days deadline
+- `app/api/admin/acceptanceRequirements/pending/route.ts` - Include submittedData in response
+- `app/api/applications/[id]/draft/route.ts` - Save projectCoordinates
+- `components/admin/acceptance-requirements-queue.tsx` - Coordinate display + overlap checking
+- `components/forms/step-acceptance-docs.tsx` - Coordinate-first workflow with locked documents
+
+---
 
 ### Version 1.4 (November 21, 2025)
 
