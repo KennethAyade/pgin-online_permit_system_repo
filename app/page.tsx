@@ -3,38 +3,42 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
-import { FileText, Shield, Clock, CheckCircle, Users, Building2, ArrowRight, Mail, Phone, MapPin } from "lucide-react"
+import { FileText, Shield, Clock, CheckCircle, Users, Building2, ArrowRight, Sparkles } from "lucide-react"
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
       <Header />
       <main className="flex-1">
 
       {/* Hero Section */}
-      <section className="bg-blue-900 text-white">
-        <div className="container mx-auto px-4 py-16">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-block bg-white/10 border border-white/20 rounded px-4 py-1.5 mb-6">
+      <section className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnptMCA2YzAgMS42NTctMS4zNDMgMy0zIDNzLTMtMS4zNDMtMy0zIDEuMzQzLTMgMy0zIDMgMS4zNDMgMyAzeiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iLjA1Ii8+PC9nPjwvc3ZnPg==')] opacity-10"></div>
+
+        <div className="container relative mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6 sm:mb-8">
+              <Sparkles className="h-4 w-4 text-yellow-300" />
               <span className="text-sm font-medium">Official Government Portal</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-semibold mb-5 leading-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight tracking-tight">
               SAG Permit Online Application System
             </h1>
-            <p className="text-lg md:text-xl text-blue-100 mb-8 leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-blue-100 mb-8 sm:mb-10 leading-relaxed max-w-2xl mx-auto">
               Industrial Sand and Gravel (ISAG) and Commercial Sand and Gravel (CSAG) permit applications
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/register">
-                <Button size="lg" className="bg-white text-blue-900 hover:bg-gray-100 font-medium px-8 py-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+              <Link href="/register" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto bg-white text-blue-700 hover:bg-blue-50 font-semibold px-8 py-6 text-base shadow-lg hover:shadow-xl transition-all">
                   Apply for Permit
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="border-2 border-white text-white hover:bg-white/10 font-medium px-8 py-6">
+              <Link href="/login" className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-blue-700 font-semibold px-8 py-6 text-base transition-all">
                   Sign In
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
             </div>
@@ -43,14 +47,14 @@ export default function HomePage() {
       </section>
 
       {/* Portal Access Cards */}
-      <section className="py-12 bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">Choose Your Portal</h2>
-              <p className="text-gray-600">Select the appropriate portal for your needs</p>
+      <section className="py-12 sm:py-16 lg:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-10 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">Choose Your Portal</h2>
+              <p className="text-base sm:text-lg text-gray-600">Select the appropriate portal for your needs</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
               {/* Applicant Portal */}
               <Card className="border border-gray-200">
                 <CardHeader className="bg-gray-50 border-b border-gray-200">

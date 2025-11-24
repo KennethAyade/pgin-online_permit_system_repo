@@ -6,7 +6,7 @@ import { DOCUMENT_REQUIREMENTS } from "@/lib/constants"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Info, FileText } from "lucide-react"
 
-interface StepMandatoryDocsProps {
+interface StepAcceptanceDocsProps {
   applicationId?: string
   permitType: "ISAG" | "CSAG"
   data: any
@@ -14,24 +14,24 @@ interface StepMandatoryDocsProps {
 }
 
 const DOCUMENT_LABELS: Record<string, string> = {
-  APPLICATION_FORM: "Application Form (MGB Form 8-4)",
+  APPLICATION_FORM: "Duly accomplished Application Form (MGB Form 8-4)",
   SURVEY_PLAN: "Survey Plan (signed & sealed by deputized Geodetic Engineer)",
   LOCATION_MAP: "Location Map (NAMRIA Topographic Map 1:50,000)",
   WORK_PROGRAM: "Work Program (MGB Form 6-2)",
   IEE_REPORT: "Initial Environmental Examination (IEE) Report",
-  EPEP: "Environmental Protection and Enhancement Program (MGB Form 16-2) - ISAG only",
+  EPEP: "Certificate of Environmental Management and Community Relations Record - ISAG only",
   PROOF_TECHNICAL_COMPETENCE: "Proof of Technical Competence (CVs, Licenses, Track Records)",
-  PROOF_FINANCIAL_CAPABILITY: "Proof of Financial Capability (Assets, FS, ITRs, Credit Lines, etc.)",
-  ARTICLES_INCORPORATION: "Articles of Incorporation / Partnership / Association (SEC Certified)",
-  OTHER_SUPPORTING_PAPERS: "Other Supporting Papers",
+  PROOF_FINANCIAL_CAPABILITY: "Proof of Financial Capability (Statement of Assets & Liabilities, FS, ITR, etc.)",
+  ARTICLES_INCORPORATION: "Articles of Incorporation / Partnership (SEC Certified, if applicable)",
+  OTHER_SUPPORTING_PAPERS: "Other supporting papers required by MGB / PMRB",
 }
 
-export function StepMandatoryDocs({
+export function StepAcceptanceDocs({
   applicationId,
   permitType,
   data,
   onUpdate,
-}: StepMandatoryDocsProps) {
+}: StepAcceptanceDocsProps) {
   const [documents, setDocuments] = useState<any[]>([])
 
   useEffect(() => {
@@ -53,13 +53,13 @@ export function StepMandatoryDocs({
   }
 
   const requirements = permitType === "ISAG"
-    ? DOCUMENT_REQUIREMENTS.ISAG.mandatory
-    : DOCUMENT_REQUIREMENTS.CSAG.mandatory
+    ? DOCUMENT_REQUIREMENTS.ISAG.acceptance
+    : DOCUMENT_REQUIREMENTS.CSAG.acceptance
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Mandatory Requirements</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Acceptance Requirements</h3>
         <p className="text-sm text-gray-600">
           Upload all required documents. Each document must be in PDF format, maximum 10MB.
         </p>

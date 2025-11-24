@@ -55,18 +55,18 @@ export default function ApplicationsPage() {
   return (
     <div className="space-y-5">
       {/* Page Header */}
-      <div className="border-b border-gray-200 bg-white p-5">
+      <div className="border-b border-gray-200 bg-white p-4 sm:p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900">
               My Applications
             </h1>
             <p className="mt-1 text-sm text-gray-600">
               View and manage your permit applications
             </p>
           </div>
-          <Link href="/applications/new">
-            <Button className="gap-2 bg-blue-900 hover:bg-blue-800">
+          <Link href="/applications/new" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto gap-2 bg-blue-700 hover:bg-blue-800">
               <Plus className="h-4 w-4" />
               New Application
             </Button>

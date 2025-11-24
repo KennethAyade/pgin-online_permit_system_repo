@@ -51,8 +51,8 @@ export function EvaluationChecklist({
   const [error, setError] = useState("")
 
   const requirements = permitType === "ISAG"
-    ? DOCUMENT_REQUIREMENTS.ISAG.mandatory
-    : DOCUMENT_REQUIREMENTS.CSAG.mandatory
+    ? DOCUMENT_REQUIREMENTS.ISAG.acceptance
+    : DOCUMENT_REQUIREMENTS.CSAG.acceptance
 
   const handleSubmit = async () => {
     const checklistItems = requirements.map((docType, index) => ({

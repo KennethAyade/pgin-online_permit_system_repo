@@ -58,6 +58,7 @@ export function AdminAcceptanceRequirementsQueue({
   const [selectedRequirement, setSelectedRequirement] = useState<RequirementItem | null>(null)
   const [decision, setDecision] = useState<"ACCEPT" | "REJECT" | null>(null)
   const [adminRemarks, setAdminRemarks] = useState("")
+  const [adminFile, setAdminFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -101,6 +102,29 @@ export function AdminAcceptanceRequirementsQueue({
     setSubmitting(true)
 
     try {
+      let adminRemarkFileUrl = undefined
+      let adminRemarkFileName = undefined
+
+      // Upload admin file if provided
+      if (adminFile) {
+        const formData = new FormData()
+        formData.append("file", adminFile)
+        formData.append("applicationId", selectedRequirement.applicationId)
+
+        const uploadResponse = await fetch("/api/documents/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error("Admin file upload failed")
+        }
+
+        const uploadResult = await uploadResponse.json()
+        adminRemarkFileUrl = uploadResult.fileUrl
+        adminRemarkFileName = adminFile.name
+      }
+
       const response = await fetch("/api/admin/acceptanceRequirements/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,6 +132,8 @@ export function AdminAcceptanceRequirementsQueue({
           requirementId: selectedRequirement.id,
           decision: reviewDecision,
           adminRemarks: adminRemarks || undefined,
+          adminRemarkFileUrl,
+          adminRemarkFileName,
         }),
       })
 
@@ -120,6 +146,7 @@ export function AdminAcceptanceRequirementsQueue({
         `Requirement ${reviewDecision === "ACCEPT" ? "accepted" : "rejected"} successfully!`
       )
       setAdminRemarks("")
+      setAdminFile(null)
       setDecision(null)
       setSelectedRequirement(null)
 
@@ -354,6 +381,26 @@ export function AdminAcceptanceRequirementsQueue({
                 disabled={submitting}
                 rows={4}
               />
+            </div>
+
+            {/* Admin File Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="adminFile">Attach File (Optional)</Label>
+              <Input
+                id="adminFile"
+                type="file"
+                onChange={(e) => setAdminFile(e.target.files?.[0] || null)}
+                disabled={submitting}
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+              />
+              <p className="text-xs text-gray-500">
+                Upload a file to send with your remarks (e.g., annotated documents, reference files)
+              </p>
+              {adminFile && (
+                <p className="text-xs text-blue-600">
+                  Selected: {adminFile.name}
+                </p>
+              )}
             </div>
 
             {/* Decision Buttons */}
