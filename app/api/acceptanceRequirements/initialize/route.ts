@@ -204,6 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create acceptance requirements
+    // PROJECT_COORDINATES (order 1) is pre-accepted since it was approved during wizard phase
     const createdRequirements = await prisma.acceptanceRequirement.createMany({
       data: requirements.map((req) => ({
         applicationId,
@@ -211,13 +212,22 @@ export async function POST(request: NextRequest) {
         requirementName: req.name,
         requirementDescription: req.description,
         order: req.order,
-        status: "PENDING_SUBMISSION",
+        // Mark PROJECT_COORDINATES as already accepted (pre-approved during wizard)
+        status: req.type === "PROJECT_COORDINATES" ? "ACCEPTED" : "PENDING_SUBMISSION",
+        // Add metadata for pre-accepted coordinates
+        ...(req.type === "PROJECT_COORDINATES" ? {
+          submittedAt: application.coordinateApprovedAt || new Date(),
+          reviewedAt: application.coordinateApprovedAt || new Date(),
+          adminRemarks: "Pre-approved during application wizard phase",
+          submittedData: JSON.stringify(application.projectCoordinates),
+        } : {}),
       })),
     })
 
-    // Get the first requirement (Project Coordinates)
-    const firstRequirement = await prisma.acceptanceRequirement.findFirst({
-      where: { applicationId, order: 1 },
+    // Get the second requirement (APPLICATION_FORM) as the first active one
+    // Since PROJECT_COORDINATES is pre-accepted, start with the next requirement
+    const firstActiveRequirement = await prisma.acceptanceRequirement.findFirst({
+      where: { applicationId, order: 2 },
     })
 
     // Update application with acceptance requirements started
@@ -225,7 +235,8 @@ export async function POST(request: NextRequest) {
       where: { id: applicationId },
       data: {
         acceptanceRequirementsStartedAt: new Date(),
-        currentAcceptanceRequirementId: firstRequirement?.id,
+        // Start with APPLICATION_FORM (order 2) since coordinates are pre-approved
+        currentAcceptanceRequirementId: firstActiveRequirement?.id,
       },
     })
 
@@ -233,7 +244,7 @@ export async function POST(request: NextRequest) {
       {
         message: "Acceptance requirements initialized successfully",
         count: createdRequirements.count,
-        firstRequirement,
+        firstActiveRequirement,
       },
       { status: 201 }
     )

@@ -10,13 +10,17 @@ export const REVISION_DEADLINE_DAYS = 14 // Applicant must resubmit within 14 wo
 
 export const APPLICATION_STEPS = {
   PERMIT_TYPE: 1,
-  PROJECT_INFO: 2,
-  PROPONENT_INFO: 3,
-  PROJECT_DETAILS: 4,
-  ACCEPTANCE_DOCS: 5,
-  OTHER_REQUIREMENTS: 6,
-  REVIEW: 7,
+  PROJECT_COORDINATES: 2,    // Must be approved before continuing
+  PROJECT_INFO: 3,
+  PROPONENT_INFO: 4,
+  PROJECT_DETAILS: 5,
+  ACCEPTANCE_DOCS: 6,
+  OTHER_REQUIREMENTS: 7,
+  REVIEW: 8,
 } as const
+
+// Total steps in the application wizard
+export const TOTAL_WIZARD_STEPS = 8
 
 export const DOCUMENT_REQUIREMENTS = {
   ISAG: {

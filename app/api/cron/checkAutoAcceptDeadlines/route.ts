@@ -23,6 +23,71 @@ export async function GET(request: NextRequest) {
   try {
     const now = new Date()
 
+    const results = {
+      coordinatesChecked: 0,
+      coordinatesAutoApproved: 0,
+      requirementsChecked: 0,
+      requirementsAutoAccepted: 0,
+      errors: [] as string[],
+    }
+
+    // === PART 1: Check for expired coordinate review deadlines ===
+    const expiredCoordinates = await prisma.application.findMany({
+      where: {
+        status: "PENDING_COORDINATE_APPROVAL",
+        coordinateReviewDeadline: {
+          lt: now,
+        },
+      },
+      include: { user: true },
+    })
+
+    results.coordinatesChecked = expiredCoordinates.length
+
+    for (const application of expiredCoordinates) {
+      try {
+        // Auto-approve coordinates
+        await prisma.application.update({
+          where: { id: application.id },
+          data: {
+            status: "DRAFT",
+            coordinateApprovedAt: now,
+            coordinateReviewDeadline: null,
+            coordinateReviewRemarks: "Auto-approved due to admin review deadline expiration",
+          },
+        })
+
+        // Create status history
+        await prisma.applicationStatusHistory.create({
+          data: {
+            applicationId: application.id,
+            fromStatus: "PENDING_COORDINATE_APPROVAL",
+            toStatus: "DRAFT",
+            changedBy: "SYSTEM",
+            changedByRole: "SYSTEM",
+            remarks: "Coordinates auto-approved due to admin review deadline expiration",
+          },
+        })
+
+        // Notify applicant
+        await prisma.notification.create({
+          data: {
+            userId: application.userId,
+            applicationId: application.id,
+            type: "COORDINATES_AUTO_APPROVED",
+            title: "Coordinates Auto-Approved",
+            message: `Your project coordinates for application ${application.applicationNo} have been auto-approved due to admin review deadline expiration. You can now continue with your application.`,
+            link: `/applications/${application.id}`,
+          },
+        })
+
+        results.coordinatesAutoApproved++
+      } catch (error) {
+        results.errors.push(`Failed to auto-approve coordinates for ${application.id}: ${error}`)
+      }
+    }
+
+    // === PART 2: Check for expired acceptance requirement deadlines ===
     // Find all requirements with expired auto-accept deadlines that are still PENDING_REVIEW
     const expiredRequirements = await prisma.acceptanceRequirement.findMany({
       where: {
@@ -39,11 +104,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const results = {
-      checked: expiredRequirements.length,
-      autoAccepted: 0,
-      errors: [] as string[],
-    }
+    results.requirementsChecked = expiredRequirements.length
 
     // Auto-accept requirements with expired admin deadline
     for (const requirement of expiredRequirements) {
@@ -103,7 +164,7 @@ export async function GET(request: NextRequest) {
           },
         })
 
-        results.autoAccepted++
+        results.requirementsAutoAccepted++
       } catch (error) {
         results.errors.push(`Failed to auto-accept requirement ${requirement.id}: ${error}`)
       }

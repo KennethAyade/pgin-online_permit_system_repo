@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepPermitType } from "./step-permit-type"
+import { StepProjectCoordinates } from "./step-project-coordinates"
 import { StepProjectInfo } from "./step-project-info"
 import { StepProponentInfo } from "./step-proponent-info"
 import { StepProjectDetails } from "./step-project-details"
 import { StepAcceptanceDocs } from "./step-acceptance-docs"
 import { StepOtherRequirements } from "./step-other-requirements"
 import { StepReview } from "./step-review"
-import { APPLICATION_STEPS } from "@/lib/constants"
-import { ChevronLeft, ChevronRight, Save } from "lucide-react"
+import { APPLICATION_STEPS, TOTAL_WIZARD_STEPS } from "@/lib/constants"
+import { ChevronLeft, ChevronRight, Save, Send, Clock, AlertTriangle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ApplicationWizardProps {
@@ -26,10 +27,17 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   const [currentStep, setCurrentStep] = useState(initialData?.currentStep || 1)
   const [formData, setFormData] = useState<any>(initialData || {})
   const [isSaving, setIsSaving] = useState(false)
+  const [isSubmittingCoordinates, setIsSubmittingCoordinates] = useState(false)
   const [applicationIdState, setApplicationIdState] = useState<string | undefined>(applicationId)
+  const [applicationStatus, setApplicationStatus] = useState<string>(initialData?.status || "DRAFT")
 
-  const totalSteps = 7
+  const totalSteps = TOTAL_WIZARD_STEPS
   const progress = (currentStep / totalSteps) * 100
+
+  // Check if coordinates are approved (can proceed beyond Step 2)
+  const coordinatesApproved = applicationStatus === "DRAFT" && formData.coordinateApprovedAt
+  const coordinatesPending = applicationStatus === "PENDING_COORDINATE_APPROVAL"
+  const coordinatesRejected = applicationStatus === "COORDINATE_REVISION_REQUIRED"
 
   // Initialize form data from initialData when it changes
   useEffect(() => {
@@ -38,12 +46,15 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       if (initialData.currentStep) {
         setCurrentStep(initialData.currentStep)
       }
+      if (initialData.status) {
+        setApplicationStatus(initialData.status)
+      }
     }
   }, [initialData])
 
-  // Auto-save draft when form data changes
+  // Auto-save draft when form data changes (only for steps after application creation)
   useEffect(() => {
-    if (applicationIdState && currentStep >= APPLICATION_STEPS.PROJECT_INFO) {
+    if (applicationIdState && currentStep >= APPLICATION_STEPS.PROJECT_COORDINATES) {
       const timeoutId = setTimeout(() => {
         saveDraft()
       }, 2000) // Debounce: save 2 seconds after last change
@@ -74,12 +85,67 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
     }
   }
 
+  const handleSubmitCoordinates = async () => {
+    if (!applicationIdState || !formData.projectCoordinates) {
+      alert("Please enter all coordinate points before submitting")
+      return
+    }
+
+    // Validate all points have values
+    const coords = formData.projectCoordinates
+    for (let i = 1; i <= 4; i++) {
+      const point = coords[`point${i}`]
+      if (!point?.latitude || !point?.longitude) {
+        alert(`Please enter both latitude and longitude for Point ${i}`)
+        return
+      }
+    }
+
+    setIsSubmittingCoordinates(true)
+    try {
+      const response = await fetch(`/api/applications/${applicationIdState}/submit-coordinates`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectCoordinates: formData.projectCoordinates,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        alert(result.error || "Failed to submit coordinates")
+        return
+      }
+
+      // Update local status
+      setApplicationStatus("PENDING_COORDINATE_APPROVAL")
+      alert("Coordinates submitted for review! You will be notified once they are approved.")
+    } catch (error) {
+      console.error("Error submitting coordinates:", error)
+      alert("An error occurred while submitting coordinates")
+    } finally {
+      setIsSubmittingCoordinates(false)
+    }
+  }
+
   const handleNext = async () => {
+    // Step 1: Require permit type
     if (currentStep === APPLICATION_STEPS.PERMIT_TYPE && !formData.permitType) {
       return
     }
 
-    // Create application on first step if it doesn't exist
+    // Step 2: Check coordinate approval before proceeding
+    if (currentStep === APPLICATION_STEPS.PROJECT_COORDINATES) {
+      if (!coordinatesApproved) {
+        // Cannot proceed without coordinate approval
+        return
+      }
+    }
+
+    // Create application after Step 1 (PERMIT_TYPE) - now creates at step 1 to allow coordinate saving
     if (currentStep === APPLICATION_STEPS.PERMIT_TYPE && !applicationIdState) {
       try {
         const response = await fetch("/api/applications", {
@@ -89,7 +155,7 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
           },
           body: JSON.stringify({
             permitType: formData.permitType,
-            currentStep: APPLICATION_STEPS.PROJECT_INFO,
+            currentStep: APPLICATION_STEPS.PROJECT_COORDINATES,
           }),
         })
 
@@ -151,6 +217,16 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
             onUpdate={updateFormData}
           />
         )
+      case APPLICATION_STEPS.PROJECT_COORDINATES:
+        return (
+          <StepProjectCoordinates
+            data={formData}
+            onUpdate={updateFormData}
+            applicationStatus={applicationStatus}
+            coordinateReviewRemarks={formData.coordinateReviewRemarks}
+            isReadOnly={coordinatesPending}
+          />
+        )
       case APPLICATION_STEPS.PROJECT_INFO:
         return (
           <StepProjectInfo
@@ -202,6 +278,23 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
     }
   }
 
+  // Determine if we should show coordinate submit button
+  const showCoordinateSubmitButton = currentStep === APPLICATION_STEPS.PROJECT_COORDINATES &&
+    applicationIdState &&
+    !coordinatesApproved &&
+    !coordinatesPending
+
+  // Determine if Next button should be disabled
+  const isNextDisabled = () => {
+    if (currentStep === APPLICATION_STEPS.PERMIT_TYPE && !formData.permitType) {
+      return true
+    }
+    if (currentStep === APPLICATION_STEPS.PROJECT_COORDINATES && !coordinatesApproved) {
+      return true
+    }
+    return false
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <Card className="shadow-lg border-gray-200">
@@ -225,6 +318,29 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-6">
+          {/* Coordinate Approval Status Banner */}
+          {currentStep > APPLICATION_STEPS.PROJECT_COORDINATES && coordinatesPending && (
+            <Alert className="mb-6 border-blue-200 bg-blue-50">
+              <Clock className="h-4 w-4 text-blue-700" />
+              <AlertDescription className="text-blue-800 text-sm">
+                <strong>Waiting for Coordinate Approval</strong>
+                <br />
+                Your project coordinates are being reviewed. You cannot proceed until they are approved.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {currentStep > APPLICATION_STEPS.PROJECT_COORDINATES && coordinatesRejected && (
+            <Alert className="mb-6 border-red-200 bg-red-50">
+              <AlertTriangle className="h-4 w-4 text-red-700" />
+              <AlertDescription className="text-red-800 text-sm">
+                <strong>Coordinate Revision Required</strong>
+                <br />
+                Please go back to Step 2 to revise your coordinates based on the admin's feedback.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {renderStep()}
 
           <div className="flex flex-col sm:flex-row justify-between gap-3 mt-8 pt-6 border-t border-gray-200">
@@ -238,23 +354,42 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
               Previous
             </Button>
 
-            {currentStep < totalSteps ? (
-              <Button
-                onClick={handleNext}
-                className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={!applicationIdState}
-                className="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white"
-              >
-                Submit Application
-              </Button>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Submit Coordinates Button (Step 2 only, when not yet approved/pending) */}
+              {showCoordinateSubmitButton && (
+                <Button
+                  onClick={handleSubmitCoordinates}
+                  disabled={isSubmittingCoordinates}
+                  className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSubmittingCoordinates ? "Submitting..." : "Submit for Review"}
+                </Button>
+              )}
+
+              {/* Next Button */}
+              {currentStep < totalSteps && (
+                <Button
+                  onClick={handleNext}
+                  disabled={isNextDisabled()}
+                  className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white disabled:opacity-50"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+
+              {/* Submit Application Button (Final Step) */}
+              {currentStep === totalSteps && (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!applicationIdState}
+                  className="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white"
+                >
+                  Submit Application
+                </Button>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

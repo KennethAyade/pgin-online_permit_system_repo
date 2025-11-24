@@ -23,6 +23,69 @@ export async function GET(request: NextRequest) {
   try {
     const now = new Date()
 
+    const results = {
+      coordinatesChecked: 0,
+      coordinatesVoided: 0,
+      requirementsChecked: 0,
+      requirementsVoided: 0,
+      errors: [] as string[],
+    }
+
+    // === PART 1: Check for expired coordinate revision deadlines ===
+    const expiredCoordinates = await prisma.application.findMany({
+      where: {
+        status: "COORDINATE_REVISION_REQUIRED",
+        coordinateRevisionDeadline: {
+          lt: now,
+        },
+      },
+      include: { user: true },
+    })
+
+    results.coordinatesChecked = expiredCoordinates.length
+
+    for (const application of expiredCoordinates) {
+      try {
+        // Void the application
+        await prisma.application.update({
+          where: { id: application.id },
+          data: {
+            status: "VOIDED",
+            coordinateRevisionDeadline: null,
+          },
+        })
+
+        // Create status history
+        await prisma.applicationStatusHistory.create({
+          data: {
+            applicationId: application.id,
+            fromStatus: "COORDINATE_REVISION_REQUIRED",
+            toStatus: "VOIDED",
+            changedBy: "SYSTEM",
+            changedByRole: "SYSTEM",
+            remarks: "Application voided due to coordinate revision deadline expiration",
+          },
+        })
+
+        // Notify applicant
+        await prisma.notification.create({
+          data: {
+            userId: application.userId,
+            applicationId: application.id,
+            type: "COORDINATES_REVISION_EXPIRED",
+            title: "Application Voided",
+            message: `Your application ${application.applicationNo} has been voided due to expiration of the coordinate revision deadline. Please start a new application.`,
+            link: `/applications`,
+          },
+        })
+
+        results.coordinatesVoided++
+      } catch (error) {
+        results.errors.push(`Failed to void application ${application.id}: ${error}`)
+      }
+    }
+
+    // === PART 2: Check for expired requirement revision deadlines ===
     // Find all requirements with expired revision deadlines that are in REVISION_REQUIRED status
     const expiredRequirements = await prisma.acceptanceRequirement.findMany({
       where: {
@@ -39,11 +102,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const results = {
-      checked: expiredRequirements.length,
-      voided: 0,
-      errors: [] as string[],
-    }
+    results.requirementsChecked = expiredRequirements.length
 
     // Void applications with expired revisions
     for (const requirement of expiredRequirements) {
@@ -79,7 +138,7 @@ export async function GET(request: NextRequest) {
           },
         })
 
-        results.voided++
+        results.requirementsVoided++
       } catch (error) {
         results.errors.push(`Failed to void requirement ${requirement.id}: ${error}`)
       }

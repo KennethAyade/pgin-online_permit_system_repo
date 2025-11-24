@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { FileText, Clock, CheckCircle2, XCircle, Building2, Users, ArrowRight, CheckSquare } from "lucide-react"
+import { FileText, Clock, CheckCircle2, XCircle, Building2, Users, ArrowRight, CheckSquare, MapPin } from "lucide-react"
 import { AdminAcceptanceRequirementsQueue } from "./acceptance-requirements-queue"
+import { CoordinateReviewQueue } from "./coordinate-review-queue"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface DashboardStats {
@@ -118,6 +119,11 @@ export function AdminDashboard() {
           <span className="hidden sm:inline">Overview</span>
           <span className="sm:hidden">Info</span>
         </TabsTrigger>
+        <TabsTrigger value="coordinates" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white text-xs sm:text-sm whitespace-nowrap">
+          <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+          <span className="hidden lg:inline">Coordinate Reviews</span>
+          <span className="lg:hidden">Coords</span>
+        </TabsTrigger>
         <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white text-xs sm:text-sm whitespace-nowrap">
           <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
           <span className="hidden lg:inline">Acceptance Requirements Queue</span>
@@ -212,6 +218,10 @@ export function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+      </TabsContent>
+
+      <TabsContent value="coordinates">
+        <CoordinateReviewQueue />
       </TabsContent>
 
       <TabsContent value="acceptance">

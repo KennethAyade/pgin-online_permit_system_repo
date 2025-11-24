@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 1.5
+**Document Version**: 1.6
 **Last Updated**: 2025-11-24
-**Status**: Production Ready (Pending Cron Job Configuration)
-**Latest Update**: Coordinate-first workflow with 14 working days deadlines and overlap checking
+**Status**: Production Ready (Pending Cron Job Configuration & DB Migration)
+**Latest Update**: Coordinate-first approval flow - coordinates must be submitted and approved as Step 2 BEFORE proceeding with application
 
 ---
 
@@ -91,35 +91,43 @@ The system implements a unique **step-by-step acceptance requirements workflow**
 - Role-based access control (Admin, Evaluator, Reviewer, PMRB, Regional Director)
 - Admin login detected by email domain (@mgb, @pgin, @admin)
 
-### 2. APPLICATION CREATION (7-Step Wizard)
+### 2. APPLICATION CREATION (8-Step Wizard)
 
-Users create permit applications through a guided 7-step wizard:
+Users create permit applications through a guided 8-step wizard with **coordinate-first approval**:
 
 **Step 1: Permit Type Selection**
 - Choose between ISAG (Industrial) or CSAG (Commercial)
 - View **complete requirements list** for each permit type (all 10-11 requirements displayed)
 
-**Step 2: Project Information**
+**Step 2: Project Coordinates Submission** ⭐ NEW FLOW
+- **Must be approved before continuing** - this is the gate for the rest of the application
+- Enter 4 boundary points with separate Latitude/Longitude fields
+- Click "Submit for Review" to send coordinates to admin
+- Admin has **14 working days** to review (auto-approves if exceeded)
+- Admin checks for **overlap with existing approved projects**
+- If rejected, applicant has **14 working days** to revise (application voided if expired)
+- **Steps 3-8 are locked** until coordinates are approved
+- Application status: `PENDING_COORDINATE_APPROVAL` → `DRAFT` (on approval)
+
+**Step 3: Project Information**
 - Enter project name
 - Specify project area (hectares)
 - Footprint area
 - Number of employees
 - Estimated project cost
 
-**Step 3: Proponent Information**
+**Step 4: Proponent Information**
 - Auto-filled from user profile (editable)
 - Business/company information (if corporate)
 
-**Step 4: Project Details**
+**Step 5: Project Details**
 - Additional project specifics
 - Location details
 
-**Step 5: Project Coordinates Submission**
-- **Coordinate-First Workflow**: Only Project Coordinates are submitted in this step
-- Enter 4 boundary points with separate Latitude/Longitude fields
-- Document uploads are **locked** until coordinates are approved by admin
-- After submission, applicant sees preview of upcoming document requirements
-- Remaining documents submitted through Acceptance Requirements section after approval
+**Step 6: Acceptance Documents**
+- Upload all required documents (10 for ISAG, 9 for CSAG)
+- Project Coordinates already approved in Step 2
+- Documents uploaded during wizard, reviewed during Acceptance Requirements phase
 
 **ISAG Requirements (11 items - Sequential):**
 1. Project Coordinates (4 points with separate Latitude/Longitude fields)
@@ -1259,6 +1267,86 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 1.6 (November 24, 2025)
+
+**MAJOR: Coordinate-First Approval Flow** ⭐
+- Project Coordinates moved to **Step 2** of application wizard (was Step 5)
+- Coordinates must be **approved by admin before** applicant can proceed to Steps 3-8
+- Creates a two-phase approval process: coordinates → rest of application
+- Application locked at Step 2 until admin approves coordinates
+
+**New Application Statuses:**
+- `PENDING_COORDINATE_APPROVAL` - Coordinates submitted, waiting for admin review
+- `COORDINATE_REVISION_REQUIRED` - Coordinates rejected, applicant must revise
+
+**8-Step Wizard (previously 7 steps):**
+1. Permit Type Selection
+2. **Project Coordinates** ← NEW POSITION (with Submit for Review button)
+3. Project Information
+4. Proponent Information
+5. Project Details
+6. Acceptance Documents
+7. Other Requirements
+8. Review & Submit
+
+**Admin Coordinate Review System:**
+- New "Coordinate Reviews" tab in admin dashboard
+- Dedicated review queue showing pending coordinate approvals
+- Overlap checking with existing approved projects
+- Approve/reject with remarks
+- 14 working days deadline enforcement
+
+**New API Endpoints (4):**
+- `POST /api/applications/[id]/submit-coordinates` - Submit coordinates for review
+- `GET /api/admin/coordinates/pending` - List pending coordinate reviews
+- `POST /api/admin/coordinates/review` - Approve/reject coordinates
+
+**New Notification Types:**
+- `COORDINATES_SUBMITTED` - To admin when applicant submits
+- `COORDINATES_APPROVED` - To applicant when approved
+- `COORDINATES_REJECTED` - To applicant when rejected
+- `COORDINATES_AUTO_APPROVED` - When admin misses 14-day deadline
+- `COORDINATES_REVISION_EXPIRED` - When applicant misses revision deadline
+
+**Database Schema Updates:**
+- Added `coordinateReviewDeadline` field to Application
+- Added `coordinateRevisionDeadline` field to Application
+- Added `coordinateApprovedAt` field to Application
+- Added `coordinateReviewRemarks` field to Application
+
+**Cron Job Updates:**
+- `checkAutoAcceptDeadlines` - Now also checks coordinate auto-approval
+- `checkRevisionDeadlines` - Now also checks coordinate revision voiding
+
+**Acceptance Requirements Initialization:**
+- PROJECT_COORDINATES automatically marked as ACCEPTED (pre-approved during wizard)
+- Starts with APPLICATION_FORM as first active requirement
+
+**Files Created (5):**
+- `components/forms/step-project-coordinates.tsx` - New wizard step component
+- `components/admin/coordinate-review-queue.tsx` - Admin review interface
+- `app/api/applications/[id]/submit-coordinates/route.ts` - Submit for review
+- `app/api/admin/coordinates/pending/route.ts` - List pending reviews
+- `app/api/admin/coordinates/review/route.ts` - Approve/reject coordinates
+
+**Files Modified (12):**
+- `prisma/schema.prisma` - New statuses, notification types, and fields
+- `lib/constants.ts` - Updated APPLICATION_STEPS, added TOTAL_WIZARD_STEPS
+- `components/forms/application-wizard.tsx` - Major rewrite for new flow
+- `components/forms/step-acceptance-docs.tsx` - Removed coordinates section
+- `components/admin/admin-dashboard.tsx` - Added Coordinate Reviews tab
+- `app/api/cron/checkAutoAcceptDeadlines/route.ts` - Added coordinate handling
+- `app/api/cron/checkRevisionDeadlines/route.ts` - Added coordinate handling
+- `app/api/acceptanceRequirements/initialize/route.ts` - Pre-accept coordinates
+
+**Migration Required:**
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+---
 
 ### Version 1.5 (November 24, 2025)
 

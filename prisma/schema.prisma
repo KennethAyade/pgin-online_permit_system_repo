@@ -22,6 +22,8 @@ enum PermitType {
 
 enum ApplicationStatus {
   DRAFT
+  PENDING_COORDINATE_APPROVAL    // Coordinates submitted, waiting for admin review
+  COORDINATE_REVISION_REQUIRED   // Coordinates rejected, applicant must revise
   SUBMITTED
   ACCEPTANCE_IN_PROGRESS
   UNDER_REVIEW
@@ -127,6 +129,11 @@ enum NotificationType {
   REQUIREMENT_PENDING_REVIEW
   APPLICATION_VOIDED
   REQUIREMENT_AUTO_ACCEPTED
+  COORDINATES_SUBMITTED          // Coordinates submitted for review (to admin)
+  COORDINATES_APPROVED           // Coordinates approved, can continue application
+  COORDINATES_REJECTED           // Coordinates rejected, revision required
+  COORDINATES_AUTO_APPROVED      // Admin didn't review within 14 working days
+  COORDINATES_REVISION_EXPIRED   // Applicant didn't revise within 14 working days
 }
 
 enum AcceptanceRequirementStatus {
@@ -217,6 +224,12 @@ model Application {
   numEmployees Int?
   projectCost  Decimal? @db.Decimal(15, 2)
   projectCoordinates Json?  // 4-point coordinates {point1: {lat, lng}, point2: {lat, lng}, point3: {lat, lng}, point4: {lat, lng}}
+
+  // Coordinate Review (Phase 1 approval)
+  coordinateReviewDeadline   DateTime?  // Admin must review within 14 working days
+  coordinateRevisionDeadline DateTime?  // Applicant must revise within 14 working days
+  coordinateApprovedAt       DateTime?  // When admin approved coordinates
+  coordinateReviewRemarks    String?    @db.Text  // Admin remarks for approval/rejection
 
   // Application Status
   status       ApplicationStatus @default(DRAFT)
