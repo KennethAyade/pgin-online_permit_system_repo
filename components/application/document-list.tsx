@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { File, Download, CheckCircle2, XCircle, FileText } from "lucide-react"
+import { File, Download, CheckCircle2, XCircle, FileText, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { DocumentUpload } from "@/components/application/document-upload"
@@ -55,17 +55,25 @@ export function DocumentList({
   const [previewDocument, setPreviewDocument] = useState<any | null>(null)
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
 
-  // Collect checklist item names that are marked non-compliant for document verification
-  const nonCompliantItemNames = new Set<string>()
+  // Collect checklist items that are non-compliant with their remarks
+  const nonCompliantItems = new Map<string, { remarks: string | null; checkedBy: string | null }>()
   if (evaluations && evaluations.length > 0) {
     for (const evaluation of evaluations) {
       if (!evaluation?.checklistItems) continue
       for (const item of evaluation.checklistItems) {
         if (item?.category === "DOCUMENT_VERIFICATION" && item.isCompliant === false) {
-          nonCompliantItemNames.add(item.itemName)
+          nonCompliantItems.set(item.itemName, {
+            remarks: item.remarks || null,
+            checkedBy: evaluation.evaluator?.fullName || null
+          })
         }
       }
     }
+  }
+
+  // Helper function to get non-compliant info for a document
+  const getNonCompliantInfo = (label: string, documentType: string) => {
+    return nonCompliantItems.get(label) || nonCompliantItems.get(documentType) || null
   }
 
   const handleDownload = (documentId: string) => {
@@ -93,8 +101,8 @@ export function DocumentList({
           <div className="space-y-3">
             {documents.map((document) => {
               const label = DOCUMENT_LABELS[document.documentType] || document.documentType
-              const isNonCompliant =
-                nonCompliantItemNames.has(label) || nonCompliantItemNames.has(document.documentType)
+              const nonCompliantInfo = getNonCompliantInfo(label, document.documentType)
+              const isNonCompliant = nonCompliantInfo !== null
 
               return (
                 <div
@@ -107,21 +115,25 @@ export function DocumentList({
                 >
                   <div className="flex items-center gap-3 flex-1 justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`p-2 rounded-lg ${document.isComplete ? "bg-green-100" : "bg-gray-200"}`}>
+                      <div className={`p-2 rounded-lg ${isNonCompliant ? "bg-red-100" : document.isComplete ? "bg-green-100" : "bg-gray-200"}`}>
                         <File
                           className={`h-5 w-5 ${
-                            document.isComplete ? "text-green-700" : "text-gray-500"
+                            isNonCompliant ? "text-red-700" : document.isComplete ? "text-green-700" : "text-gray-500"
                           }`}
                         />
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-gray-900 text-sm flex items-center gap-2">
                           {label}
-                          {isNonCompliant && (
+                          {isNonCompliant ? (
                             <Badge className="bg-red-100 text-red-800 border-red-300 text-[10px] uppercase">
                               Non-compliant
                             </Badge>
-                          )}
+                          ) : document.isComplete ? (
+                            <Badge className="bg-green-100 text-green-800 border-green-300 text-[10px] uppercase">
+                              Compliant
+                            </Badge>
+                          ) : null}
                         </p>
                         <p className="text-xs text-gray-500">
                           {document.fileName} • Version {document.version}
@@ -132,7 +144,9 @@ export function DocumentList({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {document.isComplete ? (
+                      {isNonCompliant ? (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      ) : document.isComplete ? (
                         <CheckCircle2 className="h-5 w-5 text-green-600" />
                       ) : (
                         <XCircle className="h-5 w-5 text-gray-400" />
@@ -155,7 +169,8 @@ export function DocumentList({
                         <Download className="h-4 w-4 mr-1" />
                         Download
                       </Button>
-                      {canEdit && (
+                      {/* Only show Replace button for non-compliant documents */}
+                      {canEdit && isNonCompliant && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -164,14 +179,31 @@ export function DocumentList({
                               editingDocumentId === document.id ? null : document.id
                             )
                           }
-                          className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                          className="border-red-300 text-red-700 hover:bg-red-50"
                         >
                           Replace
                         </Button>
                       )}
                     </div>
                   </div>
-                  {canEdit && editingDocumentId === document.id && (
+
+                  {/* Show admin remarks for non-compliant documents */}
+                  {isNonCompliant && nonCompliantInfo?.remarks && (
+                    <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-red-800">Admin Remarks:</p>
+                          <p className="text-sm text-red-700 mt-1">{nonCompliantInfo.remarks}</p>
+                          {nonCompliantInfo.checkedBy && (
+                            <p className="text-xs text-red-600 mt-2">— Reviewed by {nonCompliantInfo.checkedBy}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {canEdit && isNonCompliant && editingDocumentId === document.id && (
                     <div className="mt-4 border-t border-gray-200 pt-4">
                       <DocumentUpload
                         applicationId={applicationId}
