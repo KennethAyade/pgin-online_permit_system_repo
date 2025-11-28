@@ -26,6 +26,8 @@ enum ApplicationStatus {
   COORDINATE_REVISION_REQUIRED   // Coordinates rejected, applicant must revise
   SUBMITTED
   ACCEPTANCE_IN_PROGRESS
+  PENDING_OTHER_DOCUMENTS        // All acceptance reqs accepted, waiting for other docs upload
+  PENDING_OTHER_DOCS_REVIEW      // Other documents submitted, waiting for admin review
   UNDER_REVIEW
   INITIAL_CHECK
   TECHNICAL_REVIEW
@@ -158,6 +160,13 @@ enum AcceptanceRequirementType {
   OTHER_SUPPORTING_PAPERS
 }
 
+enum OtherDocumentStatus {
+  PENDING_SUBMISSION
+  PENDING_REVIEW
+  ACCEPTED
+  REVISION_REQUIRED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -224,6 +233,7 @@ model Application {
   numEmployees Int?
   projectCost  Decimal? @db.Decimal(15, 2)
   projectCoordinates Json?  // 4-point coordinates {point1: {lat, lng}, point2: {lat, lng}, point3: {lat, lng}, point4: {lat, lng}}
+  uploadedDocuments Json?   // Batch uploaded acceptance requirements {requirementType: {fileUrl, fileName}}
 
   // Coordinate Review (Phase 1 approval)
   coordinateReviewDeadline   DateTime?  // Admin must review within 14 working days
@@ -265,7 +275,6 @@ model Application {
   permitIssuedAt DateTime?
   
   // Acceptance Requirements Tracking
-  currentAcceptanceRequirementId String?
   acceptanceRequirementsStartedAt DateTime?
 
   // Timestamps
@@ -278,6 +287,7 @@ model Application {
   comments     Comment[]
   evaluations  Evaluation[]
   acceptanceRequirements AcceptanceRequirement[]
+  otherDocuments OtherDocument[]
   notifications Notification[]
 
   @@index([userId])
@@ -336,6 +346,48 @@ model AcceptanceRequirement {
   @@index([status])
   @@index([order])
   @@map("acceptance_requirements")
+}
+
+model OtherDocument {
+  id                String   @id @default(cuid())
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Document Details
+  documentType      String
+  documentName      String
+  status            OtherDocumentStatus @default(PENDING_SUBMISSION)
+
+  // Submission
+  submittedAt       DateTime?
+  submittedBy       String?
+  submittedFileUrl  String?
+  submittedFileName String?
+
+  // Admin Review
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  adminRemarks      String?  @db.Text
+  adminRemarkFileUrl String?
+  adminRemarkFileName String?
+
+  // Deadlines
+  autoAcceptDeadline DateTime?
+  revisionDeadline   DateTime?
+
+  // Flags
+  isAutoAccepted     Boolean @default(false)
+  isVoided           Boolean @default(false)
+  voidedAt           DateTime?
+  voidReason         String?
+
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("other_documents")
 }
 
 model Document {

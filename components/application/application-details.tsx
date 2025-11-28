@@ -8,9 +8,10 @@ import { StatusTimeline } from "./status-timeline"
 import { DocumentList } from "./document-list"
 import { CommentsSection } from "./comments-section"
 import { AcceptanceRequirementsSection } from "./acceptance-requirements-section"
+import { OtherDocumentsSection } from "./other-documents-section"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Clock, MessageSquare, History, ClipboardCheck, CheckSquare } from "lucide-react"
+import { FileText, Clock, MessageSquare, History, ClipboardCheck, CheckSquare, Folder } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ApplicationDetailsProps {
@@ -23,6 +24,16 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
   const [submitLoading, setSubmitLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
+
+  // Check if Other Documents tab should be visible
+  const showOtherDocuments = application.status === "PENDING_OTHER_DOCUMENTS" ||
+                             application.status === "PENDING_OTHER_DOCS_REVIEW" ||
+                             application.status === "UNDER_REVIEW" ||
+                             application.status === "INITIAL_CHECK" ||
+                             application.status === "TECHNICAL_REVIEW" ||
+                             application.status === "FOR_FINAL_APPROVAL" ||
+                             application.status === "APPROVED" ||
+                             application.status === "REJECTED"
 
   const handleResubmit = async () => {
     try {
@@ -72,6 +83,13 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
           <span className="hidden lg:inline">Acceptance Requirements</span>
           <span className="lg:hidden">Accept.</span>
         </TabsTrigger>
+        {showOtherDocuments && (
+          <TabsTrigger value="other-documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
+            <Folder className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden lg:inline">Other Documents</span>
+            <span className="lg:hidden">Other</span>
+          </TabsTrigger>
+        )}
         <TabsTrigger value="documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
           <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
           <span className="hidden sm:inline">Documents</span>
@@ -194,9 +212,18 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
           applicationNo={application.applicationNo}
           projectName={application.projectName}
           permitType={application.permitType}
-          currentRequirementId={application.currentAcceptanceRequirementId}
         />
       </TabsContent>
+
+      {showOtherDocuments && (
+        <TabsContent value="other-documents">
+          <OtherDocumentsSection
+            applicationId={application.id}
+            applicationNo={application.applicationNo}
+            projectName={application.projectName}
+          />
+        </TabsContent>
+      )}
 
       <TabsContent value="documents">
         <DocumentList

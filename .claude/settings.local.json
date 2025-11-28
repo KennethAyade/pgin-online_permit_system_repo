@@ -7,7 +7,9 @@
       "Bash(npx shadcn@latest add:*)",
       "Bash(git mv:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx prisma generate)"
+      "Bash(npx prisma generate)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run db:reset:*)"
     ],
     "deny": [],
     "ask": []

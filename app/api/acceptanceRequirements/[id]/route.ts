@@ -71,7 +71,6 @@ export async function GET(
           projectName: application.projectName,
           permitType: application.permitType,
           status: application.status,
-          currentAcceptanceRequirementId: application.currentAcceptanceRequirementId,
           acceptanceRequirementsStartedAt: application.acceptanceRequirementsStartedAt,
         },
         requirements: application.acceptanceRequirements,

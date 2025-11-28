@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { addWorkingDays } from "@/lib/utils"
+import { ADMIN_REVIEW_DEADLINE_DAYS } from "@/lib/constants"
 
 /**
  * Initialize acceptance requirements for an application based on permit type
@@ -30,7 +32,9 @@ export async function POST(request: NextRequest) {
     // Get application
     const application = await prisma.application.findUnique({
       where: { id: applicationId },
-      include: { user: true }
+      include: {
+        user: true,
+      }
     })
 
     if (!application) {
@@ -203,48 +207,98 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create acceptance requirements
+    // Get uploaded documents from JSON field (batch uploaded during wizard)
+    const uploadedDocumentsJson = (application.uploadedDocuments as Record<string, {fileUrl: string, fileName: string}>) || {}
+
+    // Create acceptance requirements with batch upload support
     // PROJECT_COORDINATES (order 1) is pre-accepted since it was approved during wizard phase
-    const createdRequirements = await prisma.acceptanceRequirement.createMany({
-      data: requirements.map((req) => ({
+    // Other requirements: if document uploaded, set to PENDING_REVIEW; otherwise PENDING_SUBMISSION
+    const requirementsData = requirements.map((req) => {
+      const uploadedDoc = uploadedDocumentsJson[req.type]
+      const isCoordinates = req.type === "PROJECT_COORDINATES"
+      const hasUploadedFile = !!uploadedDoc
+
+      // Base data
+      const baseData = {
         applicationId,
         requirementType: req.type as any,
         requirementName: req.name,
         requirementDescription: req.description,
         order: req.order,
-        // Mark PROJECT_COORDINATES as already accepted (pre-approved during wizard)
-        status: req.type === "PROJECT_COORDINATES" ? "ACCEPTED" : "PENDING_SUBMISSION",
-        // Add metadata for pre-accepted coordinates
-        ...(req.type === "PROJECT_COORDINATES" ? {
+      }
+
+      // For coordinates (pre-accepted)
+      if (isCoordinates) {
+        return {
+          ...baseData,
+          status: "ACCEPTED" as any,
           submittedAt: application.coordinateApprovedAt || new Date(),
           reviewedAt: application.coordinateApprovedAt || new Date(),
           adminRemarks: "Pre-approved during application wizard phase",
           submittedData: JSON.stringify(application.projectCoordinates),
-        } : {}),
-      })),
+        }
+      }
+
+      // For documents that were uploaded during wizard (batch upload)
+      if (hasUploadedFile) {
+        return {
+          ...baseData,
+          status: "PENDING_REVIEW" as any,
+          submittedAt: new Date(),
+          submittedBy: session.user.id,
+          submittedFileUrl: uploadedDoc.fileUrl,
+          submittedFileName: uploadedDoc.fileName,
+          autoAcceptDeadline: addWorkingDays(new Date(), ADMIN_REVIEW_DEADLINE_DAYS),
+        }
+      }
+
+      // For documents not uploaded yet
+      return {
+        ...baseData,
+        status: "PENDING_SUBMISSION" as any,
+      }
     })
 
-    // Get the second requirement (APPLICATION_FORM) as the first active one
-    // Since PROJECT_COORDINATES is pre-accepted, start with the next requirement
-    const firstActiveRequirement = await prisma.acceptanceRequirement.findFirst({
-      where: { applicationId, order: 2 },
-    })
+    // Create all requirements in a transaction
+    await prisma.$transaction(
+      requirementsData.map((data) =>
+        prisma.acceptanceRequirement.create({ data })
+      )
+    )
 
     // Update application with acceptance requirements started
     await prisma.application.update({
       where: { id: applicationId },
       data: {
         acceptanceRequirementsStartedAt: new Date(),
-        // Start with APPLICATION_FORM (order 2) since coordinates are pre-approved
-        currentAcceptanceRequirementId: firstActiveRequirement?.id,
+        status: "ACCEPTANCE_IN_PROGRESS",
       },
     })
+
+    // Create notifications for each PENDING_REVIEW requirement
+    const pendingReviewCount = requirementsData.filter(r => r.status === "PENDING_REVIEW").length
+
+    if (pendingReviewCount > 0) {
+      // Notify applicant
+      await prisma.notification.create({
+        data: {
+          userId: session.user.id,
+          applicationId,
+          type: "REQUIREMENT_PENDING_REVIEW",
+          title: "Requirements Submitted for Review",
+          message: `${pendingReviewCount} acceptance requirement(s) have been submitted for admin review.`,
+          link: `/applications/${applicationId}`,
+        },
+      })
+    }
 
     return NextResponse.json(
       {
         message: "Acceptance requirements initialized successfully",
-        count: createdRequirements.count,
-        firstActiveRequirement,
+        totalRequirements: requirementsData.length,
+        pendingReview: pendingReviewCount,
+        pendingSubmission: requirementsData.filter(r => r.status === "PENDING_SUBMISSION").length,
+        accepted: requirementsData.filter(r => r.status === "ACCEPTED").length,
       },
       { status: 201 }
     )

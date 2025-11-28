@@ -12,7 +12,13 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:reset": "tsx scripts/reset-database.ts",
+    "test": "tsx scripts/run-all-tests.ts",
+    "test:workflow": "tsx tests/workflows/batch-upload-workflow.test.ts",
+    "test:api:acceptance": "tsx tests/api/acceptance-requirements.test.ts",
+    "test:api:other-docs": "tsx tests/api/other-documents.test.ts",
+    "test:all": "npm run test:workflow && npm run test:api:acceptance && npm run test:api:other-docs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

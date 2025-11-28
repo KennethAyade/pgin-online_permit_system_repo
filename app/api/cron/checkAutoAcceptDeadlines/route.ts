@@ -122,36 +122,27 @@ export async function GET(request: NextRequest) {
           },
         })
 
-        // Get next requirement
-        const nextRequirement = await prisma.acceptanceRequirement.findFirst({
-          where: {
-            applicationId: application.id,
-            order: { gt: requirement.order },
-          },
-          orderBy: { order: "asc" },
+        // Check if ALL acceptance requirements are now ACCEPTED
+        const allRequirements = await prisma.acceptanceRequirement.findMany({
+          where: { applicationId: application.id },
         })
 
-        if (nextRequirement) {
-          // Update application to point to next requirement
-          await prisma.application.update({
-            where: { id: application.id },
-            data: { currentAcceptanceRequirementId: nextRequirement.id },
-          })
-        } else {
-          // All requirements completed
+        const allAccepted = allRequirements.every(req => req.status === "ACCEPTED")
+
+        if (allAccepted) {
+          // All requirements completed - unlock Other Documents phase
           await prisma.application.update({
             where: { id: application.id },
             data: {
-              currentAcceptanceRequirementId: null,
-              status: "UNDER_REVIEW", // Move to next stage
+              status: "PENDING_OTHER_DOCUMENTS", // Move to Other Documents phase
             },
           })
         }
 
         // Create notification for applicant
-        const message = nextRequirement
-          ? `Your "${requirement.requirementName}" has been auto-accepted due to admin evaluation timeout. Please proceed to submit "${nextRequirement.requirementName}".`
-          : `Your "${requirement.requirementName}" has been auto-accepted. All requirements have been completed.`
+        const message = allAccepted
+          ? `Your "${requirement.requirementName}" has been auto-accepted. All acceptance requirements have been completed. You can now proceed to Other Documents.`
+          : `Your "${requirement.requirementName}" has been auto-accepted due to admin evaluation timeout.`
 
         await prisma.notification.create({
           data: {

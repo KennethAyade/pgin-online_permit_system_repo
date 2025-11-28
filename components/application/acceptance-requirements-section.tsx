@@ -31,7 +31,6 @@ interface AcceptanceRequirementsSectionProps {
   applicationNo: string
   projectName?: string
   permitType: string
-  currentRequirementId?: string
 }
 
 const getStatusIcon = (status: string) => {
@@ -67,7 +66,6 @@ export function AcceptanceRequirementsSection({
   applicationNo,
   projectName,
   permitType,
-  currentRequirementId,
 }: AcceptanceRequirementsSectionProps) {
   const [requirements, setRequirements] = useState<AcceptanceRequirement[]>([])
   const [loading, setLoading] = useState(true)
@@ -108,12 +106,14 @@ export function AcceptanceRequirementsSection({
 
       if (result.requirements) {
         setRequirements(result.requirements)
-        // Auto-select current requirement
-        if (currentRequirementId) {
-          const current = result.requirements.find((r: any) => r.id === currentRequirementId)
-          if (current) {
-            setSelectedRequirement(current)
-          }
+        // Auto-select first non-accepted requirement or first requirement
+        const firstPending = result.requirements.find(
+          (r: any) => r.status === "PENDING_SUBMISSION" || r.status === "REVISION_REQUIRED"
+        )
+        if (firstPending) {
+          setSelectedRequirement(firstPending)
+        } else if (result.requirements.length > 0) {
+          setSelectedRequirement(result.requirements[0])
         }
       }
     } catch (err) {
@@ -284,11 +284,6 @@ export function AcceptanceRequirementsSection({
           {/* Requirements List */}
           <div className="space-y-2">
             {requirements.map((req, index) => {
-              const isCurrentRequirement = req.id === currentRequirementId
-              const isLocked = !isCurrentRequirement && req.status !== "ACCEPTED" && index > 0
-              const previousRequirementCompleted =
-                index === 0 || requirements[index - 1]?.status === "ACCEPTED"
-
               return (
                 <div
                   key={req.id}
@@ -296,8 +291,8 @@ export function AcceptanceRequirementsSection({
                     selectedRequirement?.id === req.id
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-200 hover:border-gray-300"
-                  } ${isLocked ? "opacity-50" : ""}`}
-                  onClick={() => !isLocked && setSelectedRequirement(req)}
+                  }`}
+                  onClick={() => setSelectedRequirement(req)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">

@@ -5,10 +5,10 @@ import { addWorkingDays } from "@/lib/utils"
 import { REVISION_DEADLINE_DAYS } from "@/lib/constants"
 
 /**
- * Admin review of acceptance requirement - Accept or Reject
- * POST /api/admin/acceptanceRequirements/review
+ * Admin review of other document - Accept or Reject
+ * POST /api/admin/otherDocuments/review
  * Body: {
- *   requirementId: string,
+ *   documentId: string,
  *   decision: "ACCEPT" | "REJECT",
  *   adminRemarks?: string,
  *   adminRemarkFileUrl?: string,
@@ -39,11 +39,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { requirementId, decision, adminRemarks, adminRemarkFileUrl, adminRemarkFileName } = body
+    const { documentId, decision, adminRemarks, adminRemarkFileUrl, adminRemarkFileName } = body
 
-    if (!requirementId || !decision) {
+    if (!documentId || !decision) {
       return NextResponse.json(
-        { error: "Requirement ID and decision are required" },
+        { error: "Document ID and decision are required" },
         { status: 400 }
       )
     }
@@ -55,33 +55,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get requirement
-    const requirement = await prisma.acceptanceRequirement.findUnique({
-      where: { id: requirementId },
+    // Get document
+    const document = await prisma.otherDocument.findUnique({
+      where: { id: documentId },
       include: { application: { include: { user: true } } },
     })
 
-    if (!requirement) {
+    if (!document) {
       return NextResponse.json(
-        { error: "Requirement not found" },
+        { error: "Document not found" },
         { status: 404 }
       )
     }
 
     // Check if in correct state for review
-    if (requirement.status !== "PENDING_REVIEW") {
+    if (document.status !== "PENDING_REVIEW") {
       return NextResponse.json(
-        { error: `Cannot review requirement in ${requirement.status} status` },
+        { error: `Cannot review document in ${document.status} status` },
         { status: 409 }
       )
     }
 
-    const application = requirement.application
+    const application = document.application
 
     if (decision === "ACCEPT") {
-      // ACCEPT the requirement
-      const updatedRequirement = await prisma.acceptanceRequirement.update({
-        where: { id: requirementId },
+      // ACCEPT the document
+      const updatedDocument = await prisma.otherDocument.update({
+        where: { id: documentId },
         data: {
           status: "ACCEPTED",
           reviewedAt: new Date(),
@@ -92,19 +92,19 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Check if ALL acceptance requirements are now ACCEPTED
-      const allRequirements = await prisma.acceptanceRequirement.findMany({
+      // Check if ALL other documents are now ACCEPTED
+      const allDocuments = await prisma.otherDocument.findMany({
         where: { applicationId: application.id },
       })
 
-      const allAccepted = allRequirements.every(req => req.status === "ACCEPTED")
+      const allAccepted = allDocuments.every(doc => doc.status === "ACCEPTED")
 
       if (allAccepted) {
-        // All requirements are accepted - unlock Other Documents section
+        // All other documents are accepted - move to next phase
         await prisma.application.update({
           where: { id: application.id },
           data: {
-            status: "PENDING_OTHER_DOCUMENTS",
+            status: "UNDER_REVIEW",
           },
         })
 
@@ -114,20 +114,20 @@ export async function POST(request: NextRequest) {
             userId: application.userId,
             applicationId: application.id,
             type: "REQUIREMENT_ACCEPTED",
-            title: "All Acceptance Requirements Approved",
-            message: `All acceptance requirements have been approved! You can now proceed to upload other required documents.`,
+            title: "All Other Documents Approved",
+            message: `All other documents have been approved! Your application will now proceed to evaluation.`,
             link: `/applications/${application.id}`,
           },
         })
       } else {
-        // Some requirements still pending
+        // Some documents still pending
         await prisma.notification.create({
           data: {
             userId: application.userId,
             applicationId: application.id,
             type: "REQUIREMENT_ACCEPTED",
-            title: "Requirement Accepted",
-            message: `Your "${requirement.requirementName}" has been accepted.`,
+            title: "Other Document Accepted",
+            message: `Your "${document.documentName}" has been accepted.`,
             link: `/applications/${application.id}`,
           },
         })
@@ -135,18 +135,18 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          message: "Requirement accepted successfully",
-          requirement: updatedRequirement,
+          message: "Document accepted successfully",
+          document: updatedDocument,
           allAccepted,
         },
         { status: 200 }
       )
     } else {
-      // REJECT the requirement
+      // REJECT the document
       const revisionDeadline = addWorkingDays(new Date(), REVISION_DEADLINE_DAYS) // 14 working days
 
-      const updatedRequirement = await prisma.acceptanceRequirement.update({
-        where: { id: requirementId },
+      const updatedDocument = await prisma.otherDocument.update({
+        where: { id: documentId },
         data: {
           status: "REVISION_REQUIRED",
           reviewedAt: new Date(),
@@ -164,16 +164,16 @@ export async function POST(request: NextRequest) {
           userId: application.userId,
           applicationId: application.id,
           type: "REQUIREMENT_REVISION_NEEDED",
-          title: "Requirement Needs Revision",
-          message: `Your "${requirement.requirementName}" requires revision. ${adminRemarks ? `Admin remarks: ${adminRemarks}` : ""} Please resubmit by ${revisionDeadline.toLocaleDateString()}.`,
+          title: "Other Document Needs Revision",
+          message: `Your "${document.documentName}" requires revision. ${adminRemarks ? `Admin remarks: ${adminRemarks}` : ""} Please resubmit by ${revisionDeadline.toLocaleDateString()}.`,
           link: `/applications/${application.id}`,
         },
       })
 
       return NextResponse.json(
         {
-          message: "Requirement rejected - revision required",
-          requirement: updatedRequirement,
+          message: "Document rejected - revision required",
+          document: updatedDocument,
           revisionDeadline,
         },
         { status: 200 }
