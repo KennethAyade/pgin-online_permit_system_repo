@@ -14,6 +14,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "tsx scripts/reset-database.ts",
+    "fix-stuck-apps": "tsx scripts/fix-stuck-other-documents.ts",
     "test": "tsx scripts/run-all-tests.ts",
     "test:workflow": "tsx tests/workflows/batch-upload-workflow.test.ts",
     "test:api:acceptance": "tsx tests/api/acceptance-requirements.test.ts",

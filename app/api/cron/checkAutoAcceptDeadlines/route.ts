@@ -137,6 +137,32 @@ export async function GET(request: NextRequest) {
               status: "PENDING_OTHER_DOCUMENTS", // Move to Other Documents phase
             },
           })
+
+          // Initialize Other Documents (Phase 2) - only if not already initialized
+          const existingOtherDocs = await prisma.otherDocument.findMany({
+            where: { applicationId: application.id },
+          })
+
+          if (existingOtherDocs.length === 0) {
+            const otherDocTypes = [
+              { type: "ECC", name: "Environmental Compliance Certificate" },
+              { type: "LGU_ENDORSEMENT", name: "LGU Endorsement" },
+              { type: "COMMUNITY_CONSENT", name: "Community Consent" },
+              { type: "ANCESTRAL_DOMAIN_CLEARANCE", name: "Ancestral Domain Clearance" },
+              { type: "BUSINESS_PERMIT", name: "Business Permit" },
+            ]
+
+            for (const doc of otherDocTypes) {
+              await prisma.otherDocument.create({
+                data: {
+                  applicationId: application.id,
+                  documentType: doc.type,
+                  documentName: doc.name,
+                  status: "PENDING_SUBMISSION",
+                },
+              })
+            }
+          }
         }
 
         // Create notification for applicant
