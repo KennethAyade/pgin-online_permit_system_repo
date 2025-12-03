@@ -55,5 +55,8 @@ uploads/
 *.swo
 *~
 
+# Claude Code
+.claude/settings.local.json
+
 # OS
 Thumbs.db
