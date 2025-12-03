@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { addWorkingDays } from "@/lib/utils"
 import { ADMIN_REVIEW_DEADLINE_DAYS } from "@/lib/constants"
+import {
+  normalizeCoordinates,
+  validatePolygonGeometry,
+  type CoordinatePoint
+} from "@/lib/geo/coordinate-validation"
 
 export async function POST(
   request: NextRequest,
@@ -21,26 +26,36 @@ export async function POST(
     const { id } = await params
     const body = await request.json()
 
-    // Validate coordinates structure
+    // Get coordinates from request (support both old and new formats)
     const { projectCoordinates } = body
-    if (!projectCoordinates ||
-        !projectCoordinates.point1 || !projectCoordinates.point2 ||
-        !projectCoordinates.point3 || !projectCoordinates.point4) {
+
+    if (!projectCoordinates) {
       return NextResponse.json(
-        { error: "All 4 coordinate points are required" },
+        { error: "Project coordinates are required" },
         { status: 400 }
       )
     }
 
-    // Validate each point has latitude and longitude
-    for (let i = 1; i <= 4; i++) {
-      const point = projectCoordinates[`point${i}`]
-      if (!point.latitude || !point.longitude) {
-        return NextResponse.json(
-          { error: `Point ${i} must have both latitude and longitude` },
-          { status: 400 }
-        )
-      }
+    // Normalize coordinates to array format (handles both old and new formats)
+    const coordinates = normalizeCoordinates(projectCoordinates)
+
+    if (!coordinates || coordinates.length === 0) {
+      return NextResponse.json(
+        { error: "Invalid coordinate format" },
+        { status: 400 }
+      )
+    }
+
+    // Validate polygon geometry (min 3 points, no self-intersection, etc.)
+    const validation = validatePolygonGeometry(coordinates)
+    if (!validation.isValid) {
+      return NextResponse.json(
+        {
+          error: "Coordinate validation failed",
+          validationErrors: validation.errors
+        },
+        { status: 400 }
+      )
     }
 
     // Check if application exists and belongs to user
@@ -74,11 +89,11 @@ export async function POST(
     // Calculate admin review deadline (14 working days)
     const coordinateReviewDeadline = addWorkingDays(new Date(), ADMIN_REVIEW_DEADLINE_DAYS)
 
-    // Update application with coordinates and change status
+    // Store coordinates in new array format
     const application = await prisma.application.update({
       where: { id },
       data: {
-        projectCoordinates,
+        projectCoordinates: coordinates as any, // Store as array of {lat, lng} points
         status: "PENDING_COORDINATE_APPROVAL",
         coordinateReviewDeadline,
         coordinateRevisionDeadline: null, // Clear any previous revision deadline
@@ -94,7 +109,7 @@ export async function POST(
         toStatus: "PENDING_COORDINATE_APPROVAL",
         changedBy: session.user.id,
         changedByRole: "APPLICANT",
-        remarks: "Project coordinates submitted for admin review",
+        remarks: `Project coordinates submitted for admin review (${coordinates.length} points)`,
       },
     })
 
@@ -111,7 +126,7 @@ export async function POST(
         applicationId: id,
         type: "COORDINATES_SUBMITTED",
         title: "New Coordinates for Review",
-        message: `Application ${application.applicationNo} has submitted project coordinates for review. Please verify there is no overlap with existing projects.`,
+        message: `Application ${application.applicationNo} has submitted project coordinates (${coordinates.length} boundary points) for review. Please verify there is no overlap with existing projects.`,
         link: `/admin/applications/${id}`,
       })),
     })
@@ -120,6 +135,7 @@ export async function POST(
       application,
       message: "Coordinates submitted for review successfully",
       reviewDeadline: coordinateReviewDeadline,
+      pointCount: coordinates.length,
     })
   } catch (error) {
     console.error("Error submitting coordinates:", error)

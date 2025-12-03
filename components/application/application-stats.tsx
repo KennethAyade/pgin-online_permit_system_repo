@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
-import { FileText, Clock, CheckCircle2, XCircle, Building2, Users } from "lucide-react"
+import { Loader2, FileText, Clock, CheckCircle2, XCircle } from "lucide-react"
 
 interface Stats {
   total: number
@@ -95,26 +94,10 @@ export function ApplicationStats() {
       bgColor: "bg-red-100",
       textColor: "text-red-700",
     },
-    {
-      label: "ISAG",
-      value: stats.isag,
-      icon: Building2,
-      color: "purple",
-      bgColor: "bg-purple-100",
-      textColor: "text-purple-700",
-    },
-    {
-      label: "CSAG",
-      value: stats.csag,
-      icon: Users,
-      color: "indigo",
-      bgColor: "bg-indigo-100",
-      textColor: "text-indigo-700",
-    },
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {statCards.map((stat) => {
         const Icon = stat.icon
         return (

@@ -13,6 +13,13 @@ export const registerSchema = z.object({
   birthdate: z.date(),
   mobileNumber: z.string().optional(),
   companyName: z.string().optional(),
+  // Representative information (for CORPORATE)
+  representativeFullName: z.string().optional(),
+  representativeEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
+  representativeContactNumber: z.string().optional(),
+  representativeBirthday: z.date().optional(),
+  // President information (for CORPORATE)
+  presidentFullName: z.string().optional(),
   // Address components
   region: z.string().min(1, "Region is required"),
   province: z.string().min(1, "Province is required"),
@@ -20,14 +27,19 @@ export const registerSchema = z.object({
   barangay: z.string().min(1, "Barangay is required"),
   acceptTerms: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
 }).refine((data) => {
-  // Company name is required if accountType is CORPORATE
-  if (data.accountType === "CORPORATE" && !data.companyName) {
-    return false
+  // All corporate fields are required if accountType is CORPORATE
+  if (data.accountType === "CORPORATE") {
+    if (!data.companyName) return false
+    if (!data.representativeFullName) return false
+    if (!data.representativeEmail) return false
+    if (!data.representativeContactNumber) return false
+    if (!data.representativeBirthday) return false
+    if (!data.presidentFullName) return false
   }
   return true
 }, {
-  message: "Company name is required for corporate accounts",
-  path: ["companyName"],
+  message: "All representative and president information is required for corporate accounts",
+  path: ["accountType"],
 })
 
 export const loginSchema = z.object({

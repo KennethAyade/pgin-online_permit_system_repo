@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, User, Mail, Lock, Calendar, Phone, Building, MapPin, AlertCircle } from "lucide-react"
+import { Loader2, User, Mail, Lock, Calendar, Phone, Building, MapPin, AlertCircle, Upload, FileCheck } from "lucide-react"
 import { philippinesAddressAPI } from "@/lib/services/philippines-address-api"
 
 export function RegistrationForm() {
@@ -27,6 +27,12 @@ export function RegistrationForm() {
   const [loadingCities, setLoadingCities] = useState(false)
   const [loadingBarangays, setLoadingBarangays] = useState(false)
   const [addressError, setAddressError] = useState<string>("")
+
+  // File upload states for corporate accounts
+  const [presidentAuthLetter, setPresidentAuthLetter] = useState<File | null>(null)
+  const [governmentId, setGovernmentId] = useState<File | null>(null)
+  const [companyId, setCompanyId] = useState<File | null>(null)
+  const [secDtiCertificate, setSecDtiCertificate] = useState<File | null>(null)
 
   const {
     register,
@@ -154,15 +160,47 @@ export function RegistrationForm() {
     setError("")
 
     try {
+      // Create FormData for file uploads
+      const formData = new FormData()
+
+      // Append all form fields
+      formData.append("accountType", data.accountType)
+      formData.append("email", data.email)
+      formData.append("password", data.password)
+      formData.append("fullName", data.fullName)
+      formData.append("birthdate", data.birthdate.toISOString())
+      if (data.mobileNumber) formData.append("mobileNumber", data.mobileNumber)
+      if (data.companyName) formData.append("companyName", data.companyName)
+
+      // Representative information
+      if (data.representativeFullName) formData.append("representativeFullName", data.representativeFullName)
+      if (data.representativeEmail) formData.append("representativeEmail", data.representativeEmail)
+      if (data.representativeContactNumber) formData.append("representativeContactNumber", data.representativeContactNumber)
+      if (data.representativeBirthday) formData.append("representativeBirthday", data.representativeBirthday.toISOString())
+
+      // President information
+      if (data.presidentFullName) formData.append("presidentFullName", data.presidentFullName)
+
+      // Address components
+      formData.append("region", data.region)
+      formData.append("province", data.province)
+      formData.append("city", data.city)
+      formData.append("barangay", data.barangay)
+
+      formData.append("acceptTerms", data.acceptTerms.toString())
+
+      // Append files if corporate account
+      if (data.accountType === "CORPORATE") {
+        if (presidentAuthLetter) formData.append("presidentAuthLetter", presidentAuthLetter)
+        if (governmentId) formData.append("governmentId", governmentId)
+        if (companyId) formData.append("companyId", companyId)
+        if (secDtiCertificate) formData.append("secDtiCertificate", secDtiCertificate)
+      }
+
       const response = await fetch("/api/users/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          birthdate: data.birthdate.toISOString(),
-        }),
+        // Don't set Content-Type header - browser will set it automatically for FormData
+        body: formData,
       })
 
       const result = await response.json()
@@ -364,6 +402,120 @@ export function RegistrationForm() {
         )}
       </div>
 
+      {/* Corporate Representative Information - Only for Corporate */}
+      {accountType === "CORPORATE" && (
+        <div className="space-y-4 border-t pt-6">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Representative / Authorized Signatory <span className="text-red-500">*</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="representativeFullName" className="text-sm font-medium text-gray-700">
+                Representative Full Name <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="representativeFullName"
+                  placeholder="Representative's full name"
+                  className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  {...register("representativeFullName")}
+                />
+              </div>
+              {errors.representativeFullName && (
+                <p className="text-sm text-red-600 mt-1">{errors.representativeFullName.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="representativeEmail" className="text-sm font-medium text-gray-700">
+                Representative Email <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="representativeEmail"
+                  type="email"
+                  placeholder="representative@company.com"
+                  className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  {...register("representativeEmail")}
+                />
+              </div>
+              {errors.representativeEmail && (
+                <p className="text-sm text-red-600 mt-1">{errors.representativeEmail.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="representativeContactNumber" className="text-sm font-medium text-gray-700">
+                Representative Contact Number <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="representativeContactNumber"
+                  type="tel"
+                  placeholder="+63 9XX XXX XXXX"
+                  className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  {...register("representativeContactNumber")}
+                />
+              </div>
+              {errors.representativeContactNumber && (
+                <p className="text-sm text-red-600 mt-1">{errors.representativeContactNumber.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="representativeBirthday" className="text-sm font-medium text-gray-700">
+                Representative Birthday <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Input
+                  id="representativeBirthday"
+                  type="date"
+                  className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  {...register("representativeBirthday", {
+                    valueAsDate: true,
+                  })}
+                />
+              </div>
+              {errors.representativeBirthday && (
+                <p className="text-sm text-red-600 mt-1">{errors.representativeBirthday.message}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* President Information - Only for Corporate */}
+      {accountType === "CORPORATE" && (
+        <div className="space-y-4 border-t pt-6">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Company President <span className="text-red-500">*</span>
+          </h3>
+
+          <div className="space-y-2">
+            <Label htmlFor="presidentFullName" className="text-sm font-medium text-gray-700">
+              President's Full Name <span className="text-red-500">*</span>
+            </Label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                id="presidentFullName"
+                placeholder="President's full name"
+                className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                {...register("presidentFullName")}
+              />
+            </div>
+            {errors.presidentFullName && (
+              <p className="text-sm text-red-600 mt-1">{errors.presidentFullName.message}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Address - Cascading Dropdowns */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">Address <span className="text-red-500">*</span></h3>
@@ -492,6 +644,142 @@ export function RegistrationForm() {
           </div>
         </div>
       </div>
+
+      {/* Required Document Uploads - Only for Corporate */}
+      {accountType === "CORPORATE" && (
+        <div className="space-y-4 border-t pt-6">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Required Documents <span className="text-red-500">*</span>
+          </h3>
+
+          {/* Simple list-style upload layout as specified */}
+          <div className="space-y-3">
+            {/* President Authorization Letter */}
+            <div className="flex items-center justify-between py-3 border-b">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  President's Authorization Letter <span className="text-red-500">*</span>
+                </Label>
+                {presidentAuthLetter && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <FileCheck className="h-3 w-3" />
+                    {presidentAuthLetter.name}
+                  </p>
+                )}
+              </div>
+              <div className="ml-4">
+                <input
+                  type="file"
+                  id="presidentAuthLetter"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setPresidentAuthLetter(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="presidentAuthLetter"
+                  className="cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 inline-flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </label>
+              </div>
+            </div>
+
+            {/* Government ID */}
+            <div className="flex items-center justify-between py-3 border-b">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  Government ID <span className="text-red-500">*</span>
+                </Label>
+                {governmentId && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <FileCheck className="h-3 w-3" />
+                    {governmentId.name}
+                  </p>
+                )}
+              </div>
+              <div className="ml-4">
+                <input
+                  type="file"
+                  id="governmentId"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setGovernmentId(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="governmentId"
+                  className="cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 inline-flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </label>
+              </div>
+            </div>
+
+            {/* Company ID */}
+            <div className="flex items-center justify-between py-3 border-b">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  Company ID <span className="text-red-500">*</span>
+                </Label>
+                {companyId && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <FileCheck className="h-3 w-3" />
+                    {companyId.name}
+                  </p>
+                )}
+              </div>
+              <div className="ml-4">
+                <input
+                  type="file"
+                  id="companyId"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setCompanyId(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="companyId"
+                  className="cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 inline-flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </label>
+              </div>
+            </div>
+
+            {/* SEC/DTI Registration Certificate */}
+            <div className="flex items-center justify-between py-3 border-b">
+              <div className="flex-1">
+                <Label className="text-sm font-medium text-gray-700">
+                  SEC or DTI Registration Certificate <span className="text-red-500">*</span>
+                </Label>
+                {secDtiCertificate && (
+                  <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <FileCheck className="h-3 w-3" />
+                    {secDtiCertificate.name}
+                  </p>
+                )}
+              </div>
+              <div className="ml-4">
+                <input
+                  type="file"
+                  id="secDtiCertificate"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setSecDtiCertificate(e.target.files?.[0] || null)}
+                />
+                <label
+                  htmlFor="secDtiCertificate"
+                  className="cursor-pointer px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 inline-flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose File
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Terms and Conditions */}
       <div className="flex items-start space-x-3 pt-2">

@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StepPermitType } from "./step-permit-type"
 import { StepProjectCoordinates } from "./step-project-coordinates"
 import { StepProjectInfo } from "./step-project-info"
-import { StepProponentInfo } from "./step-proponent-info"
 import { StepProjectDetails } from "./step-project-details"
 import { StepAcceptanceDocs } from "./step-acceptance-docs"
 import { StepOtherRequirements } from "./step-other-requirements"
@@ -27,6 +26,7 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   const [currentStep, setCurrentStep] = useState(initialData?.currentStep || 1)
   const [formData, setFormData] = useState<any>(initialData || {})
   const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const [isSubmittingCoordinates, setIsSubmittingCoordinates] = useState(false)
   const [applicationIdState, setApplicationIdState] = useState<string | undefined>(applicationId)
   const [applicationStatus, setApplicationStatus] = useState<string>(initialData?.status || "DRAFT")
@@ -67,6 +67,7 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
     if (!applicationIdState) return
 
     setIsSaving(true)
+    setShowSaved(false)
     try {
       await fetch(`/api/applications/${applicationIdState}/draft`, {
         method: "PUT",
@@ -78,6 +79,10 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
           currentStep,
         }),
       })
+
+      // Show "Saved" indicator for 2 seconds after save completes
+      setShowSaved(true)
+      setTimeout(() => setShowSaved(false), 2000)
     } catch (error) {
       console.error("Error saving draft:", error)
     } finally {
@@ -182,8 +187,46 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
     }
   }
 
+  const validateRequiredFields = (): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = []
+
+    // Check required project information
+    if (!formData.projectName?.trim()) {
+      errors.push("Project Name is required")
+    }
+    if (!formData.projectArea) {
+      errors.push("Project Area is required")
+    }
+    if (!formData.footprintArea) {
+      errors.push("Footprint Area is required")
+    }
+    if (!formData.numEmployees) {
+      errors.push("Number of Employees is required")
+    }
+    if (!formData.projectCost) {
+      errors.push("Project Cost is required")
+    }
+
+    // Check coordinates are approved
+    if (!formData.coordinateApprovedAt) {
+      errors.push("Project Coordinates must be approved before submission")
+    }
+
+    return { isValid: errors.length === 0, errors }
+  }
+
   const handleSubmit = async () => {
     if (!applicationIdState) return
+
+    // Validate required fields before submission
+    const validation = validateRequiredFields()
+    if (!validation.isValid) {
+      alert(
+        "Please complete the following required fields before submitting:\n\n" +
+        validation.errors.map(err => `• ${err}`).join("\n")
+      )
+      return
+    }
 
     try {
       const response = await fetch(`/api/applications/${applicationIdState}/submit`, {
@@ -230,13 +273,6 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       case APPLICATION_STEPS.PROJECT_INFO:
         return (
           <StepProjectInfo
-            data={formData}
-            onUpdate={updateFormData}
-          />
-        )
-      case APPLICATION_STEPS.PROPONENT_INFO:
-        return (
-          <StepProponentInfo
             data={formData}
             onUpdate={updateFormData}
           />
@@ -306,6 +342,12 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
                 <Save className="h-4 w-4 animate-pulse" />
                 <span className="hidden sm:inline">Saving draft...</span>
                 <span className="sm:hidden">Saving...</span>
+              </div>
+            )}
+            {!isSaving && showSaved && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <Save className="h-4 w-4" />
+                <span>Saved</span>
               </div>
             )}
           </div>

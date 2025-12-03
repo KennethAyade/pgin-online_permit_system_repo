@@ -136,6 +136,9 @@ enum NotificationType {
   COORDINATES_REJECTED           // Coordinates rejected, revision required
   COORDINATES_AUTO_APPROVED      // Admin didn't review within 14 working days
   COORDINATES_REVISION_EXPIRED   // Applicant didn't revise within 14 working days
+  CONSENT_UPLOADED               // Phase 2.4: Consent document uploaded for admin verification
+  CONSENT_VERIFIED               // Phase 2.4: Consent document verified by admin
+  CONSENT_REJECTED               // Phase 2.4: Consent document rejected by admin
 }
 
 enum AcceptanceRequirementStatus {
@@ -167,6 +170,20 @@ enum OtherDocumentStatus {
   REVISION_REQUIRED
 }
 
+enum CoordinateHistoryStatus {
+  ACTIVE      // Currently active coordinates
+  REPLACED    // Superseded by new coordinates
+  VOIDED      // Application voided
+}
+
+enum ConsentStatus {
+  REQUIRED       // Consent document required
+  UPLOADED       // Uploaded, pending verification
+  VERIFIED       // Admin verified consent
+  REJECTED       // Consent rejected by admin
+  NOT_REQUIRED   // No consent needed (no overlap)
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -185,6 +202,16 @@ model User {
   // Business Information
   companyName   String?
 
+  // Representative Information (required for CORPORATE accounts)
+  representativeFullName      String?
+  representativeEmail         String?
+  representativeContactNumber String?
+  representativeBirthday      DateTime?
+
+  // President Information (required for CORPORATE accounts)
+  presidentFullName                String?
+  presidentAuthorizationLetterUrl  String?
+
   // Address Components (Philippine Divisions)
   region        String?
   province      String?
@@ -194,8 +221,10 @@ model User {
   // Legacy address field (for backward compatibility - will be deprecated)
   address       String?
 
-  // Government ID
-  governmentIdUrl String?
+  // Required Corporate Documents
+  governmentIdUrl      String?
+  companyIdUrl         String?
+  secDtiCertificateUrl String?
 
   // Account Status
   emailVerified Boolean  @default(false)
@@ -217,7 +246,7 @@ model User {
 
 model Application {
   id            String   @id @default(cuid())
-  applicationNo String  @unique @default(uuid())
+  applicationNo String  @unique @default("")
   
   // Permit Type
   permitType   PermitType
@@ -289,6 +318,9 @@ model Application {
   acceptanceRequirements AcceptanceRequirement[]
   otherDocuments OtherDocument[]
   notifications Notification[]
+  coordinateHistory      CoordinateHistory[]
+  newApplicationConsents OverlapConsent[] @relation("NewApplicationConsent")
+  affectedConsents       OverlapConsent[] @relation("AffectedApplicationConsent")
 
   @@index([userId])
   @@index([status])
@@ -611,6 +643,18 @@ model Notification {
   @@map("notifications")
 }
 
+model ApplicationCounter {
+  id        String   @id @default(cuid())
+  year      Int
+  month     Int
+  counter   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, month])
+  @@map("application_counters")
+}
+
 model SystemSettings {
   id            String   @id @default(cuid())
   key           String   @unique
@@ -618,6 +662,85 @@ model SystemSettings {
   description   String?
   updatedAt     DateTime @updatedAt
   updatedBy     String?
-  
+
   @@map("system_settings")
+}
+
+model CoordinateHistory {
+  id                 String   @id @default(cuid())
+  applicationId      String
+  application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // Coordinate Data
+  coordinates        Json     // Array of {lat, lng} points (min 3, unlimited)
+  pointCount         Int
+  polygonGeoJSON     Json?    // GeoJSON representation for spatial queries
+
+  // Status
+  status             CoordinateHistoryStatus @default(ACTIVE)
+  replacedAt         DateTime?
+  replacedBy         String?  // Reference to new coordinate history ID
+
+  // Metadata
+  approvedAt         DateTime
+  approvedBy         String
+
+  // Spatial Index (for fast overlap queries)
+  bounds             Json     // {minLat, maxLat, minLng, maxLng}
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Relations
+  overlapConsents    OverlapConsent[] @relation("AffectedCoordinates")
+  consentRequests    OverlapConsent[] @relation("NewCoordinates")
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("coordinate_history")
+}
+
+model OverlapConsent {
+  id                    String   @id @default(cuid())
+
+  // Application with new coordinates
+  newApplicationId      String
+  newApplication        Application @relation("NewApplicationConsent", fields: [newApplicationId], references: [id], onDelete: Cascade)
+  newCoordinateHistoryId String
+  newCoordinateHistory  CoordinateHistory @relation("NewCoordinates", fields: [newCoordinateHistoryId], references: [id])
+
+  // Affected existing application
+  affectedApplicationId String
+  affectedApplication   Application @relation("AffectedApplicationConsent", fields: [affectedApplicationId], references: [id], onDelete: Cascade)
+  affectedCoordinateHistoryId String
+  affectedCoordinateHistory   CoordinateHistory @relation("AffectedCoordinates", fields: [affectedCoordinateHistoryId], references: [id])
+
+  // Overlap Details
+  overlapPercentage     Float    // Percentage of overlap
+  overlapArea           Float?   // Calculated overlap area (optional)
+  overlapGeoJSON        Json?    // GeoJSON of overlapping polygon
+
+  // Consent Document
+  consentStatus         ConsentStatus @default(REQUIRED)
+  consentFileUrl        String?
+  consentFileName       String?
+  consentUploadedAt     DateTime?
+  consentUploadedBy     String?  // User who uploaded
+
+  // Admin Verification
+  consentVerifiedAt     DateTime?
+  consentVerifiedBy     String?  // Admin who verified
+  verificationRemarks   String?  @db.Text
+
+  // Notifications
+  notificationSentAt    DateTime?
+  affectedPartyNotified Boolean  @default(false)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([newApplicationId])
+  @@index([affectedApplicationId])
+  @@index([consentStatus])
+  @@map("overlap_consents")
 }

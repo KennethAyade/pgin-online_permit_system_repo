@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { createApplicationSchema } from "@/lib/validations/application"
+import { generateApplicationNumber } from "@/lib/utils"
 
 export async function GET(request: NextRequest) {
   try {
@@ -84,8 +85,12 @@ export async function POST(request: NextRequest) {
 
     const data = validationResult.data
 
+    // Generate application number
+    const applicationNo = await generateApplicationNumber()
+
     // Convert string numbers to Decimal for database
     const applicationData: any = {
+      applicationNo,
       permitType: data.permitType,
       userId: session.user.id,
       projectName: data.projectName,

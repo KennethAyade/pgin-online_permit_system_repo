@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/db"
 import { addWorkingDays } from "@/lib/utils"
 import { REVISION_DEADLINE_DAYS } from "@/lib/constants"
+import { normalizeCoordinates } from "@/lib/geo/coordinate-validation"
+import { createCoordinateHistory } from "@/lib/services/coordinate-history"
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +78,48 @@ export async function POST(request: NextRequest) {
     let notificationMessage: string
 
     if (decision === "APPROVED") {
+      // Phase 2.4: Check consent requirements before approval
+      const overlapConsents = await prisma.overlapConsent.findMany({
+        where: {
+          newApplicationId: applicationId,
+        },
+      })
+
+      // If there are overlaps, verify all consents are verified
+      if (overlapConsents.length > 0) {
+        const allVerified = overlapConsents.every(
+          (consent) => consent.consentStatus === "VERIFIED"
+        )
+
+        if (!allVerified) {
+          const pendingCount = overlapConsents.filter(
+            (c) => c.consentStatus === "UPLOADED" || c.consentStatus === "REQUIRED"
+          ).length
+          const rejectedCount = overlapConsents.filter(
+            (c) => c.consentStatus === "REJECTED"
+          ).length
+
+          return NextResponse.json(
+            {
+              error: "Cannot approve coordinates - consent requirements not met",
+              details: {
+                totalOverlaps: overlapConsents.length,
+                verifiedConsents: overlapConsents.filter(
+                  (c) => c.consentStatus === "VERIFIED"
+                ).length,
+                pendingConsents: pendingCount,
+                rejectedConsents: rejectedCount,
+              },
+              message:
+                pendingCount > 0
+                  ? `There are ${pendingCount} consent document(s) pending verification.`
+                  : `There are ${rejectedCount} rejected consent document(s) that need to be re-uploaded.`,
+            },
+            { status: 400 }
+          )
+        }
+      }
+
       newStatus = "DRAFT"
       updateData.coordinateApprovedAt = new Date()
       updateData.coordinateRevisionDeadline = null
@@ -100,6 +144,22 @@ export async function POST(request: NextRequest) {
       where: { id: applicationId },
       data: updateData,
     })
+
+    // Phase 2.3: Create CoordinateHistory record when coordinates are approved
+    if (decision === "APPROVED") {
+      // Get normalized coordinates from application
+      const coordinates = normalizeCoordinates(application.projectCoordinates)
+
+      if (coordinates && coordinates.length >= 3) {
+        await createCoordinateHistory(
+          applicationId,
+          coordinates,
+          adminUser.id
+        )
+      } else {
+        console.error("Failed to create coordinate history: Invalid coordinates format")
+      }
+    }
 
     // Create status history entry
     await prisma.applicationStatusHistory.create({

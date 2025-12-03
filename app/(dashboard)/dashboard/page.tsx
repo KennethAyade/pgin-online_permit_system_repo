@@ -1,9 +1,8 @@
 import { ApplicationStats } from "@/components/application/application-stats"
-import { RecentApplications } from "@/components/application/recent-applications"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Clock, CheckCircle2, AlertCircle } from "lucide-react"
+import { Plus, FileText, Clock, AlertCircle } from "lucide-react"
 
 export default async function DashboardPage() {
   return (
@@ -31,14 +30,8 @@ export default async function DashboardPage() {
       {/* Statistics Cards */}
       <ApplicationStats />
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Recent Applications */}
-        <div className="lg:col-span-2">
-          <RecentApplications />
-        </div>
-
-        {/* Quick Actions */}
+      {/* Quick Actions */}
+      <div className="max-w-md">
         <Card className="border border-gray-200">
           <CardHeader>
             <CardTitle className="text-base font-semibold text-gray-900">Quick Actions</CardTitle>

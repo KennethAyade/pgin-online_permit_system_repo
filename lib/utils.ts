@@ -57,3 +57,41 @@ export function isWorkingDay(date: Date): boolean {
   const dayOfWeek = date.getDay()
   return dayOfWeek !== 0 && dayOfWeek !== 6
 }
+
+/**
+ * Generate application number in format: PGIN-YYYY-MM-###
+ * Counter continues globally (no monthly reset)
+ * @returns Promise<string> - Generated application number
+ */
+export async function generateApplicationNumber(): Promise<string> {
+  const { prisma } = await import("@/lib/db")
+
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1 // 1-12
+
+  // Get or create counter for current month
+  await prisma.applicationCounter.upsert({
+    where: {
+      year_month: { year, month }
+    },
+    update: {
+      counter: { increment: 1 }
+    },
+    create: {
+      year,
+      month,
+      counter: 1
+    }
+  })
+
+  // Get the TOTAL count across ALL months (global counter)
+  const totalCount = await prisma.applicationCounter.aggregate({
+    _sum: { counter: true }
+  })
+
+  const globalCounter = totalCount._sum.counter || 1
+
+  // Format: PGIN-YYYY-MM-###
+  return `PGIN-${year}-${String(month).padStart(2, '0')}-${String(globalCounter).padStart(3, '0')}`
+}

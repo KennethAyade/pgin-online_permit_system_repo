@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useDropzone } from "react-dropzone"
+import { useState, useEffect } from "react"
 import { DOCUMENT_REQUIREMENTS, MAX_FILE_SIZE } from "@/lib/constants"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Info, FileText, CheckCircle2, Upload, X, Loader2, Download } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Info, FileCheck, Upload, X, Loader2 } from "lucide-react"
 
 interface StepAcceptanceDocsProps {
   applicationId?: string
@@ -117,7 +116,7 @@ export function StepAcceptanceDocs({
       <div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">Acceptance Requirements</h3>
         <p className="text-sm text-gray-600">
-          Upload all required documents at once. Each document must be in PDF format, maximum 10MB. After submitting, the admin can review all documents in any order.
+          Upload all required documents. Each document must be in PDF format, maximum 10MB.
         </p>
       </div>
 
@@ -132,91 +131,104 @@ export function StepAcceptanceDocs({
           <Alert className="border-blue-200 bg-blue-50">
             <Info className="h-4 w-4 text-blue-700" />
             <AlertDescription className="text-blue-800 text-sm">
-              <strong>Batch Upload:</strong> You can upload all acceptance requirements at once. The admin will review each document and may approve or request revisions for any of them. Each requirement has a 14 working days deadline for admin review.
+              <strong>Batch Upload:</strong> Upload all required documents. The admin will review each document and may approve or request revisions. Each requirement has a 14 working days deadline for admin review.
             </AlertDescription>
           </Alert>
 
-          {/* Document Upload Requirements */}
-          <div className="space-y-4">
-            {requirements.map((docType, index) => {
+          {/* Simple List-Style Document Upload */}
+          <div className="space-y-3">
+            {requirements.map((docType) => {
               const isUploaded = !!uploadedDocuments[docType]
               const isUploading = uploadingStates[docType]
               const error = errors[docType]
 
               return (
-                <div
-                  key={docType}
-                  className="bg-gray-50 border border-gray-200 rounded-lg p-4"
-                >
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="bg-blue-100 p-2 rounded-lg mt-1">
-                      <FileText className="h-4 w-4 text-blue-700" />
-                    </div>
+                <div key={docType}>
+                  <div className="flex items-center justify-between py-3 border-b">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-gray-500">#{index + 1}</span>
-                        <h4 className="text-sm font-semibold text-gray-900">
-                          {DOCUMENT_LABELS[docType] || docType}
-                        </h4>
-                        {isUploaded && (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        )}
-                      </div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {DOCUMENT_LABELS[docType] || docType}
+                        <span className="text-red-500 ml-1">*</span>
+                      </Label>
+
+                      {/* Show uploaded file */}
+                      {isUploaded && (
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-green-600 flex items-center gap-1">
+                            <FileCheck className="h-3 w-3" />
+                            {uploadedDocuments[docType].fileName}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleFileDelete(docType)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Remove file"
+                            disabled={isUploading}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Show upload progress */}
+                      {isUploading && (
+                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Uploading...
+                        </p>
+                      )}
+
+                      {/* Show error */}
+                      {error && (
+                        <p className="text-xs text-red-600 mt-1">{error}</p>
+                      )}
+                    </div>
+
+                    {/* Upload button */}
+                    <div className="ml-4">
+                      <input
+                        type="file"
+                        id={`file-${docType}`}
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (file.size > MAX_FILE_SIZE) {
+                              setErrors(prev => ({
+                                ...prev,
+                                [docType]: `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`
+                              }))
+                              e.target.value = ''
+                              return
+                            }
+                            handleFileUpload(docType, file)
+                          }
+                        }}
+                        disabled={isUploading}
+                      />
+                      <label
+                        htmlFor={`file-${docType}`}
+                        className={`cursor-pointer px-4 py-2 text-white text-sm rounded inline-flex items-center gap-2 ${
+                          isUploading
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        <Upload className="h-4 w-4" />
+                        {isUploaded ? 'Replace File' : 'Choose File'}
+                      </label>
                     </div>
                   </div>
-
-                  {/* Uploaded Document Display */}
-                  {isUploaded && (
-                    <div className="mb-3 flex items-center justify-between p-3 bg-white border-2 border-green-200 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-700" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {uploadedDocuments[docType].fileName}
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleFileDelete(docType)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* File Upload Dropzone */}
-                  <FileUploadZone
-                    docType={docType}
-                    isUploaded={isUploaded}
-                    isUploading={isUploading}
-                    onFileSelect={(file) => handleFileUpload(docType, file)}
-                  />
-
-                  {/* Upload Status */}
-                  {isUploading && (
-                    <div className="mt-2 flex items-center gap-2 text-sm text-blue-700 bg-blue-50 p-2 rounded">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Uploading...</span>
-                    </div>
-                  )}
-
-                  {/* Error Display */}
-                  {error && (
-                    <Alert variant="destructive" className="mt-2 border-red-300 bg-red-50">
-                      <AlertDescription className="text-red-800 text-sm">{error}</AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               )
             })}
           </div>
 
           <Alert className="border-green-200 bg-green-50">
-            <CheckCircle2 className="h-4 w-4 text-green-700" />
+            <Info className="h-4 w-4 text-green-700" />
             <AlertDescription className="text-green-800 text-sm">
-              <strong>Next Steps:</strong> After uploading all documents and submitting your application, the admin will review each requirement. If any requirement needs revision, you'll have 14 working days to resubmit. If the admin doesn't review within 14 working days, the requirement will be automatically approved.
+              <strong>Note:</strong> PDF files only, max {MAX_FILE_SIZE / 1024 / 1024}MB per file. After submitting, the admin will review each document.
             </AlertDescription>
           </Alert>
         </>
@@ -225,66 +237,3 @@ export function StepAcceptanceDocs({
   )
 }
 
-// File Upload Zone Component
-function FileUploadZone({
-  docType,
-  isUploaded,
-  isUploading,
-  onFileSelect
-}: {
-  docType: string
-  isUploaded: boolean
-  isUploading: boolean
-  onFileSelect: (file: File) => void
-}) {
-  const onDrop = useCallback(
-    (acceptedFiles: File[]) => {
-      if (acceptedFiles.length > 0) {
-        onFileSelect(acceptedFiles[0])
-      }
-    },
-    [onFileSelect]
-  )
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/pdf": [".pdf"],
-    },
-    maxSize: MAX_FILE_SIZE,
-    multiple: false,
-    disabled: isUploading,
-  })
-
-  return (
-    <div
-      {...getRootProps()}
-      className={cn(
-        "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all",
-        isDragActive
-          ? "border-blue-500 bg-blue-50"
-          : isUploaded
-          ? "border-gray-300 hover:border-blue-400 hover:bg-gray-50"
-          : "border-gray-300 hover:border-blue-400 hover:bg-gray-50",
-        isUploading && "opacity-50 cursor-not-allowed"
-      )}
-    >
-      <input {...getInputProps()} />
-      <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-      <p className="text-xs font-medium text-gray-700">
-        {isDragActive
-          ? "Drop the PDF file here"
-          : isUploaded
-          ? "Drag & drop to replace, or click to select"
-          : "Drag & drop a PDF file here, or click to select"}
-      </p>
-      <p className="text-xs text-gray-500 mt-1">
-        PDF only, max {MAX_FILE_SIZE / 1024 / 1024}MB
-      </p>
-    </div>
-  )
-}
-
-function cn(...classes: (string | boolean | undefined)[]): string {
-  return classes.filter(Boolean).join(" ")
-}

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useDropzone } from "react-dropzone"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MAX_FILE_SIZE } from "@/lib/constants"
-import { Loader2, CheckCircle2, AlertCircle, Clock, FileUp, Upload, X, Download } from "lucide-react"
+import { Loader2, CheckCircle2, AlertCircle, Clock, FileUp, Upload, X, Download, FileCheck } from "lucide-react"
 
 interface OtherDocument {
   id: string
@@ -164,22 +164,16 @@ export function OtherDocumentsSection({
     }
   }
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setSubmissionFile(acceptedFiles[0])
+  const handleFileChange = (file: File | null) => {
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`)
+        return
+      }
+      setSubmissionFile(file)
       setError("")
     }
-  }, [])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      "application/pdf": [".pdf"],
-    },
-    maxSize: MAX_FILE_SIZE,
-    multiple: false,
-    disabled: submitting,
-  })
+  }
 
   if (loading) {
     return (
@@ -304,52 +298,79 @@ export function OtherDocumentsSection({
                     </Alert>
                   )}
 
-                  {/* Upload Section */}
+                  {/* Upload Section - Simple List Style */}
                   {canSubmit && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                    <div className="border border-gray-200 rounded-lg p-4">
                       <h4 className="text-sm font-semibold text-gray-900 mb-4">
                         {selectedDocument.status === "REVISION_REQUIRED" ? "Resubmit Document" : "Upload Document"}
                       </h4>
 
-                      {submissionFile ? (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                              <span className="text-sm font-medium text-blue-900">
-                                {submissionFile.name}
-                              </span>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSubmissionFile(null)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div
-                          {...getRootProps()}
-                          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition ${
-                            isDragActive
-                              ? "border-blue-500 bg-blue-50"
-                              : "border-gray-300 hover:border-blue-400"
-                          }`}
-                        >
-                          <input {...getInputProps()} />
-                          <Upload className="h-8 w-8 mx-auto mb-3 text-gray-400" />
-                          <p className="text-sm font-medium text-gray-700 mb-1">
-                            {isDragActive ? "Drop the PDF file here" : "Drag & drop a PDF file here, or click to select"}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            PDF only, max {MAX_FILE_SIZE / 1024 / 1024}MB
-                          </p>
-                        </div>
-                      )}
+                      {/* File Upload Row */}
+                      <div className="flex items-center justify-between py-3 border-b">
+                        <div className="flex-1">
+                          <Label className="text-sm font-medium text-gray-700">
+                            {selectedDocument.documentName}
+                            <span className="text-red-500 ml-1">*</span>
+                          </Label>
 
+                          {/* Show selected file */}
+                          {submissionFile && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs text-green-600 flex items-center gap-1">
+                                <FileCheck className="h-3 w-3" />
+                                {submissionFile.name}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => setSubmissionFile(null)}
+                                className="text-red-600 hover:text-red-800"
+                                title="Remove file"
+                                disabled={submitting}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Show upload progress */}
+                          {submitting && (
+                            <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Uploading...
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Upload button */}
+                        <div className="ml-4">
+                          <input
+                            type="file"
+                            id="other-doc-upload"
+                            accept=".pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                handleFileChange(file)
+                              }
+                            }}
+                            disabled={submitting}
+                          />
+                          <label
+                            htmlFor="other-doc-upload"
+                            className={`cursor-pointer px-4 py-2 text-white text-sm rounded inline-flex items-center gap-2 ${
+                              submitting
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                          >
+                            <Upload className="h-4 w-4" />
+                            {submissionFile ? 'Replace File' : 'Choose File'}
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Submit Button */}
                       <Button
                         onClick={handleFileUpload}
                         disabled={!submissionFile || submitting}
@@ -364,6 +385,10 @@ export function OtherDocumentsSection({
                           "Submit Document"
                         )}
                       </Button>
+
+                      <p className="text-xs text-gray-500 mt-2">
+                        PDF only, max {MAX_FILE_SIZE / 1024 / 1024}MB
+                      </p>
                     </div>
                   )}
 

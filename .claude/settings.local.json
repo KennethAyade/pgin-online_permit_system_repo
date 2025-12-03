@@ -11,7 +11,20 @@
       "Bash(npx prisma db push:*)",
       "Bash(npm run db:reset:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run fix-stuck-apps:*)"
+      "Bash(npm run fix-stuck-apps:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(if not exist \"d:\\Freelance Work\\pgin-online_permit_system_repo\\tests\" mkdir \"d:\\Freelance Work\\pgin-online_permit_system_repo\\tests\")",
+      "Bash(npm run test:unit:*)",
+      "Bash(npx jest --clearCache)",
+      "Bash(cat:*)",
+      "Bash(psql:*)",
+      "Bash(npm run test:components:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(if not exist \"lib\\geo\" mkdir \"lib\\geo\")",
+      "Bash(del nul)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
