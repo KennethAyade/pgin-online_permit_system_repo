@@ -3,6 +3,7 @@
 /**
  * Coordinate Point Manager Component
  * Phase 2.1: Dynamic add/remove coordinate points (min 3, unlimited)
+ * Updated: Support DMS (Degrees-Minutes-Seconds) coordinate format
  */
 
 import { useState } from 'react'
@@ -12,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { CoordinatePoint } from '@/lib/geo/coordinate-validation'
 import { validateCoordinatePoint } from '@/lib/geo/coordinate-validation'
+import { parseDMS, decimalToDMS, validateDMSCoordinate } from '@/lib/geo/dms-utils'
 
 interface CoordinatePointManagerProps {
   coordinates: CoordinatePoint[]
@@ -63,14 +65,39 @@ export function CoordinatePointManager({
     value: string
   ) => {
     const newCoordinates = [...coordinates]
-    const numValue = parseFloat(value)
+    
+    // Try to parse DMS format first
+    const dmsValue = parseDMS(value)
+    let numValue: number
+    
+    if (dmsValue !== null) {
+      // Valid DMS format
+      numValue = dmsValue
+    } else {
+      // Fallback to decimal format for backward compatibility
+      numValue = parseFloat(value)
+      numValue = isNaN(numValue) ? 0 : numValue
+    }
 
     newCoordinates[index] = {
       ...newCoordinates[index],
-      [field]: isNaN(numValue) ? 0 : numValue,
+      [field]: numValue,
     }
 
     onChange(newCoordinates)
+
+    // Validate DMS format if it looks like DMS
+    const trimmed = value.trim()
+    if (trimmed && /[°'""]/.test(trimmed)) {
+      const validation = validateDMSCoordinate(trimmed, field === 'lat')
+      if (!validation.isValid) {
+        setErrors({
+          ...errors,
+          [index]: [validation.error || 'Invalid DMS format'],
+        })
+        return
+      }
+    }
 
     // Validate the point
     const pointErrors = validateCoordinatePoint(newCoordinates[index], index)
@@ -126,17 +153,19 @@ export function CoordinatePointManager({
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id={`lat-${index}`}
-                      type="number"
-                      step="0.000001"
-                      value={point.lat || ''}
+                      type="text"
+                      value={point.lat && point.lat !== 0 ? decimalToDMS(point.lat, true) : ''}
                       onChange={(e) =>
                         handlePointChange(index, 'lat', e.target.value)
                       }
                       disabled={isReadOnly}
-                      placeholder="e.g., 14.5995"
+                      placeholder="e.g., 18°08'53.19&quot;"
                       className="pl-10"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Format: DD°MM'SS.SS&quot;
+                  </p>
                 </div>
 
                 {/* Longitude */}
@@ -148,17 +177,19 @@ export function CoordinatePointManager({
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id={`lng-${index}`}
-                      type="number"
-                      step="0.000001"
-                      value={point.lng || ''}
+                      type="text"
+                      value={point.lng && point.lng !== 0 ? decimalToDMS(point.lng, false) : ''}
                       onChange={(e) =>
                         handlePointChange(index, 'lng', e.target.value)
                       }
                       disabled={isReadOnly}
-                      placeholder="e.g., 120.9842"
+                      placeholder="e.g., 120°39'48.90&quot;"
                       className="pl-10"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Format: DD°MM'SS.SS&quot;
+                  </p>
                 </div>
               </div>
 

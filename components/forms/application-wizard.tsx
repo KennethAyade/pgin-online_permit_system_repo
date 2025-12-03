@@ -98,10 +98,20 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
 
     // Validate all points have values
     const coords = formData.projectCoordinates
-    for (let i = 1; i <= 4; i++) {
-      const point = coords[`point${i}`]
-      if (!point?.latitude || !point?.longitude) {
-        alert(`Please enter both latitude and longitude for Point ${i}`)
+    // Normalize to array format
+    const coordsArray = Array.isArray(coords) ? coords : []
+
+    // Validate minimum 3 points
+    if (coordsArray.length < 3) {
+      alert("Please enter at least 3 coordinate points")
+      return
+    }
+
+    // Validate each point has valid lat/lng
+    for (let i = 0; i < coordsArray.length; i++) {
+      const point = coordsArray[i]
+      if (!point?.lat || !point?.lng || point.lat === 0 || point.lng === 0) {
+        alert(`Please enter valid inputs for Point ${i + 1}`)
         return
       }
     }
@@ -127,7 +137,9 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
 
       // Update local status
       setApplicationStatus("PENDING_COORDINATE_APPROVAL")
-      alert("Coordinates submitted for review! You will be notified once they are approved.")
+      // Auto-advance to next step instead of blocking
+      setCurrentStep(currentStep + 1)
+      alert("Coordinates submitted for review! You can continue with your application.")
     } catch (error) {
       console.error("Error submitting coordinates:", error)
       alert("An error occurred while submitting coordinates")
@@ -142,13 +154,8 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       return
     }
 
-    // Step 2: Check coordinate approval before proceeding
-    if (currentStep === APPLICATION_STEPS.PROJECT_COORDINATES) {
-      if (!coordinatesApproved) {
-        // Cannot proceed without coordinate approval
-        return
-      }
-    }
+    // Step 2: Allow progression after coordinate submission
+    // Admin approval happens asynchronously and doesn't block user
 
     // Create application after Step 1 (PERMIT_TYPE) - now creates at step 1 to allow coordinate saving
     if (currentStep === APPLICATION_STEPS.PERMIT_TYPE && !applicationIdState) {

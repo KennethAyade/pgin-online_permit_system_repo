@@ -98,7 +98,7 @@ export function StepProjectCoordinates({
           <AlertDescription className="text-blue-800 text-sm">
             <strong>Coordinates Submitted for Review</strong>
             <br />
-            Your project coordinates are being reviewed by the admin. You will be notified once they are approved or if revisions are needed. The admin has 14 working days to complete the review.
+            Your project coordinates have been submitted for review and you can continue with your application. The admin will verify them in the background, and you'll be notified of any issues within 14 working days.
           </AlertDescription>
         </Alert>
       )}
@@ -137,7 +137,7 @@ export function StepProjectCoordinates({
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4 text-yellow-700" />
           <AlertDescription className="text-yellow-800 text-sm">
-            <strong>Important:</strong> You must submit your project coordinates for admin approval before you can proceed with the rest of your application. The admin will verify that your project area does not overlap with existing approved projects.
+            <strong>Important:</strong> Your project coordinates will be reviewed by the admin to ensure no overlap with existing projects. You can submit them now and continue with the rest of your application while the review happens in the background.
           </AlertDescription>
         </Alert>
       )}
@@ -182,7 +182,9 @@ export function StepProjectCoordinates({
       </div>
 
       <div className="text-xs text-gray-500 space-y-1">
-        <p>• Enter coordinates in decimal degrees format (e.g., Latitude: 14.5995, Longitude: 120.9842)</p>
+        <p>• Enter coordinates in DMS format (Degrees-Minutes-Seconds)</p>
+        <p>• Example - Latitude: 18°08'53.19", Longitude: 120°39'48.90"</p>
+        <p>• Format: DD°MM'SS.SS" where DD=degrees, MM=minutes, SS=seconds</p>
         <p>• Drag markers on the map to adjust coordinates visually</p>
         <p>• At least 3 points are required to form a valid polygon</p>
         <p>• Points should define the boundary of your project area in order</p>
