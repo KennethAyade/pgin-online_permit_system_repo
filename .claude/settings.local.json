@@ -24,7 +24,10 @@
       "Bash(npx prisma migrate dev:*)",
       "Bash(if not exist \"lib\\geo\" mkdir \"lib\\geo\")",
       "Bash(del nul)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: upgrade dependencies for React 19 and Next.js 16 compatibility\n\n- Upgrade @testing-library/react from v14 to v16 for React 19 support\n- Lock next-auth to 5.0.0-beta.30 for Next.js 16 compatibility\n- Fixes Vercel build error: peer dependency conflict with React 19\n\nBuild: ✅ Successful locally\nAll routes: 41/41 generated\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

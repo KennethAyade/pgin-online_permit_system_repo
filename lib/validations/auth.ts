@@ -11,15 +11,15 @@ export const registerSchema = z.object({
     .regex(/[^a-zA-Z0-9]/, "Password must contain at least one non-alphanumeric character"),
   fullName: z.string().min(2, "Full name is required"),
   birthdate: z.date(),
-  mobileNumber: z.string().optional(),
-  companyName: z.string().optional(),
+  mobileNumber: z.string().nullable().optional(),
+  companyName: z.string().nullable().optional(),
   // Representative information (for CORPORATE)
-  representativeFullName: z.string().optional(),
-  representativeEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
-  representativeContactNumber: z.string().optional(),
-  representativeBirthday: z.date().optional(),
+  representativeFullName: z.string().nullable().optional(),
+  representativeEmail: z.string().email("Invalid email address").nullable().optional().or(z.literal("")),
+  representativeContactNumber: z.string().nullable().optional(),
+  representativeBirthday: z.date().nullable().optional(),
   // President information (for CORPORATE)
-  presidentFullName: z.string().optional(),
+  presidentFullName: z.string().nullable().optional(),
   // Address components
   region: z.string().min(1, "Region is required"),
   province: z.string().min(1, "Province is required"),
