@@ -10,6 +10,13 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
 
+    // Log incoming registration attempt
+    console.log("[REGISTRATION] Registration attempt received", {
+      timestamp: new Date().toISOString(),
+      contentType: request.headers.get('content-type'),
+      origin: request.headers.get('origin')
+    })
+
     // Extract form fields
     const body: any = {
       accountType: formData.get("accountType"),
@@ -45,8 +52,65 @@ export async function POST(request: NextRequest) {
     })
 
     if (!validationResult.success) {
+      // Extract field-specific errors for better logging
+      const fieldErrors = validationResult.error.errors.reduce((acc, err) => {
+        const field = err.path.join('.')
+        acc[field] = err.message
+        return acc
+      }, {} as Record<string, string>)
+
+      // Log comprehensive validation failure details
+      console.error("[REGISTRATION] Validation failed", {
+        email: body.email || 'unknown',
+        accountType: body.accountType || 'unknown',
+        failedFields: Object.keys(fieldErrors),
+        errors: fieldErrors,
+        submittedData: {
+          hasEmail: !!body.email,
+          hasPassword: !!body.password,
+          hasBirthdate: !!body.birthdate,
+          hasRegion: !!body.region,
+          hasProvince: !!body.province,
+          hasCity: !!body.city,
+          hasBarangay: !!body.barangay,
+          acceptTerms: body.acceptTerms,
+          // Corporate fields
+          hasCompanyName: !!body.companyName,
+          hasRepresentativeInfo: !!(body.representativeFullName && body.representativeEmail),
+          hasPresidentName: !!body.presidentFullName,
+        }
+      })
+
+      // Map technical field names to user-friendly labels
+      const fieldLabels: Record<string, string> = {
+        'email': 'Email address',
+        'password': 'Password',
+        'fullName': 'Full name',
+        'birthdate': 'Birth date',
+        'region': 'Region',
+        'province': 'Province',
+        'city': 'City',
+        'barangay': 'Barangay',
+        'acceptTerms': 'Terms and conditions',
+        'companyName': 'Company name',
+        'representativeFullName': 'Representative name',
+        'representativeEmail': 'Representative email',
+        'representativeContactNumber': 'Representative contact',
+        'representativeBirthday': 'Representative birthday',
+        'presidentFullName': 'President name',
+      }
+
+      const userFriendlyErrors = Object.entries(fieldErrors).map(([field, message]) => {
+        const label = fieldLabels[field] || field
+        return `${label}: ${message}`
+      })
+
       return NextResponse.json(
-        { error: "Validation failed", details: validationResult.error.errors },
+        {
+          error: "Registration validation failed. Please check the following:",
+          validationErrors: userFriendlyErrors,
+          fieldErrors: fieldErrors // Keep original for programmatic access
+        },
         { status: 400 }
       )
     }
@@ -59,8 +123,14 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingUser) {
+      console.warn("[REGISTRATION] Attempt to register with existing email", {
+        email: data.email,
+        existingUserId: existingUser.id,
+        existingUserVerified: existingUser.emailVerified
+      })
+
       return NextResponse.json(
-        { error: "User with this email already exists" },
+        { error: "User with this email already exists. Please log in or use password recovery." },
         { status: 409 }
       )
     }
@@ -92,6 +162,22 @@ export async function POST(request: NextRequest) {
         "registration",
         "president_auth"
       )
+
+      if (!presidentAuthResult.success) {
+        console.error("[REGISTRATION] Failed to upload president authorization letter", {
+          email: data.email,
+          error: presidentAuthResult.error,
+          fileName: presidentAuthLetterFile.name,
+          fileSize: presidentAuthLetterFile.size
+        })
+        return NextResponse.json(
+          {
+            error: "Failed to upload President's Authorization Letter",
+            details: presidentAuthResult.error || "Unknown upload error"
+          },
+          { status: 400 }
+        )
+      }
       presidentAuthorizationLetterUrl = presidentAuthResult.fileUrl
 
       // Upload government ID
@@ -100,6 +186,22 @@ export async function POST(request: NextRequest) {
         "registration",
         "government_id"
       )
+
+      if (!govIdResult.success) {
+        console.error("[REGISTRATION] Failed to upload government ID", {
+          email: data.email,
+          error: govIdResult.error,
+          fileName: governmentIdFile.name,
+          fileSize: governmentIdFile.size
+        })
+        return NextResponse.json(
+          {
+            error: "Failed to upload Government ID",
+            details: govIdResult.error || "Unknown upload error"
+          },
+          { status: 400 }
+        )
+      }
       governmentIdUrl = govIdResult.fileUrl
 
       // Upload company ID
@@ -108,6 +210,22 @@ export async function POST(request: NextRequest) {
         "registration",
         "company_id"
       )
+
+      if (!companyIdResult.success) {
+        console.error("[REGISTRATION] Failed to upload company ID", {
+          email: data.email,
+          error: companyIdResult.error,
+          fileName: companyIdFile.name,
+          fileSize: companyIdFile.size
+        })
+        return NextResponse.json(
+          {
+            error: "Failed to upload Company ID",
+            details: companyIdResult.error || "Unknown upload error"
+          },
+          { status: 400 }
+        )
+      }
       companyIdUrl = companyIdResult.fileUrl
 
       // Upload SEC/DTI certificate
@@ -116,7 +234,28 @@ export async function POST(request: NextRequest) {
         "registration",
         "sec_dti_cert"
       )
+
+      if (!secDtiResult.success) {
+        console.error("[REGISTRATION] Failed to upload SEC/DTI certificate", {
+          email: data.email,
+          error: secDtiResult.error,
+          fileName: secDtiCertificateFile.name,
+          fileSize: secDtiCertificateFile.size
+        })
+        return NextResponse.json(
+          {
+            error: "Failed to upload SEC/DTI Certificate",
+            details: secDtiResult.error || "Unknown upload error"
+          },
+          { status: 400 }
+        )
+      }
       secDtiCertificateUrl = secDtiResult.fileUrl
+
+      console.log("[REGISTRATION] All corporate documents uploaded successfully", {
+        email: data.email,
+        documentCount: 4
+      })
     }
 
     // Create user
@@ -179,9 +318,44 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
-    console.error("Registration error:", error)
+    // Determine error type for better debugging
+    const errorType = error instanceof Error ? error.constructor.name : typeof error
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+
+    console.error("[REGISTRATION] Unhandled error during registration", {
+      errorType,
+      errorMessage,
+      errorStack,
+      timestamp: new Date().toISOString(),
+      // Safely extract any available context
+      email: (formData?.get("email") as string) || 'unknown',
+      accountType: (formData?.get("accountType") as string) || 'unknown'
+    })
+
+    // Return appropriate error based on error type
+    if (error instanceof Error) {
+      // Check for common database errors
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: "Registration failed: Email already exists" },
+          { status: 409 }
+        )
+      }
+
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: "Registration failed: Invalid data reference" },
+          { status: 400 }
+        )
+      }
+    }
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error during registration. Please try again.",
+        supportMessage: "If this persists, please contact support with timestamp: " + new Date().toISOString()
+      },
       { status: 500 }
     )
   }

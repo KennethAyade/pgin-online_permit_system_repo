@@ -55,16 +55,29 @@ export function RegistrationForm() {
     const loadRegions = async () => {
       setLoadingRegions(true)
       setAddressError("")
+
       try {
         const data = await philippinesAddressAPI.getRegions()
+
+        if (!data || data.length === 0) {
+          throw new Error("API returned empty regions list")
+        }
+
         setRegions(data)
+        console.log(`[ADDRESS] Successfully loaded ${data.length} regions`)
+
       } catch (err) {
-        console.error("Error loading regions:", err)
-        setAddressError("Failed to load regions. Please refresh the page.")
+        console.error("[ADDRESS] Error loading regions:", err)
+
+        setAddressError(
+          "Unable to load address options. This may be due to a temporary network issue. " +
+          "Please refresh the page to try again. If the problem persists, contact support."
+        )
       } finally {
         setLoadingRegions(false)
       }
     }
+
     loadRegions()
   }, [])
 
@@ -159,6 +172,26 @@ export function RegistrationForm() {
     setIsLoading(true)
     setError("")
 
+    // Pre-submission validation: ensure address data was loaded
+    if (regions.length === 0) {
+      setError(
+        "Cannot complete registration: Address options failed to load. " +
+        "Please refresh the page and try again."
+      )
+      setIsLoading(false)
+      return
+    }
+
+    // Validate address fields are not empty (double-check client-side)
+    if (!data.region || !data.province || !data.city || !data.barangay) {
+      setError(
+        "Please complete all address fields (Region, Province, City, Barangay). " +
+        "If address options are not loading, please refresh the page."
+      )
+      setIsLoading(false)
+      return
+    }
+
     try {
       // Create FormData for file uploads
       const formData = new FormData()
@@ -206,7 +239,15 @@ export function RegistrationForm() {
       const result = await response.json()
 
       if (!response.ok) {
-        setError(result.error || "Registration failed")
+        // Handle structured validation errors
+        if (result.validationErrors && Array.isArray(result.validationErrors)) {
+          setError(result.error + "\n\n" + result.validationErrors.join("\n"))
+        } else if (result.details) {
+          // Handle old-style error details
+          setError(`${result.error}: ${result.details}`)
+        } else {
+          setError(result.error || "Registration failed")
+        }
         setIsLoading(false)
         return
       }
