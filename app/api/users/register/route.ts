@@ -7,8 +7,10 @@ import { randomBytes } from "crypto"
 import { saveFile } from "@/lib/upload"
 
 export async function POST(request: NextRequest) {
+  let formData: FormData | null = null
+  
   try {
-    const formData = await request.formData()
+    formData = await request.formData()
 
     // Log incoming registration attempt
     console.log("[REGISTRATION] Registration attempt received", {
