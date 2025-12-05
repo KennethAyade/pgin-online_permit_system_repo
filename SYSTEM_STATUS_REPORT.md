@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 2.3
+**Document Version**: 2.4
 **Last Updated**: 2025-12-05
 **Status**: Production Ready (Pending Cron Job Configuration & DB Migration)
-**Latest Update**: Build Error Fixes - Resolved TypeScript compilation errors including import mismatches, missing type definitions, and React ref callback issues. Production build now succeeds with zero errors (41/41 routes generated).
+**Latest Update**: Coordinate Input UX Fix - Fixed autofill issue where typing in coordinate fields caused premature formatting. Inputs now preserve raw text while typing and only convert to DMS format on blur. Symbol buttons no longer trigger blur events.
 
 ---
 
@@ -1375,6 +1375,108 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 2.4 (December 5, 2025)
+
+**Coordinate Input UX Enhancement: Autofill Fix** 🎯
+
+This version fixes a critical user experience issue where typing in coordinate input fields caused premature auto-formatting that prevented users from editing their coordinates freely.
+
+#### Problem Description
+
+**User Report:**
+- Typing a single character (e.g., "1") in a coordinate field caused it to auto-format immediately to DMS format (e.g., "1°00'0.00"")
+- Users could not edit or continue typing after the auto-format occurred
+- This made coordinate entry extremely difficult and frustrating
+
+**Root Cause:**
+- The coordinate inputs were converting text to DMS format on every keystroke (onChange event)
+- No distinction between "typing mode" and "display mode"
+- Symbol buttons (°, ', ") triggered blur events that converted and formatted the value
+- State wasn't properly cleared when points were added or removed, causing stale data with shifted indices
+
+#### Solutions Implemented
+
+**1. Focus-Aware Input State Management**
+
+Added focus tracking to distinguish between typing and display modes:
+- **While typing (focused)**: Show raw text value without formatting
+- **After leaving field (blurred)**: Convert to decimal and display as formatted DMS
+
+**Implementation:**
+```typescript
+// Track focused field and its raw text value
+const [focusedField, setFocusedField] = useState<string | null>(null)
+const [textValues, setTextValues] = useState<Record<string, string>>({})
+
+// Separate handlers for typing vs conversion
+const handlePointChange = (index, field, value) => {
+  // Just store text, no conversion
+  setTextValues(prev => ({ ...prev, [`${index}-${field}`]: value }))
+}
+
+const handlePointBlur = (index, field, value) => {
+  // Parse DMS and convert to decimal
+  const numValue = parseDMS(value) ?? parseFloat(value)
+  // Update coordinates with decimal value
+}
+```
+
+**2. State Cleanup on Point Changes**
+
+Added `useEffect` to clear text state when points are added or removed:
+```typescript
+useEffect(() => {
+  setTextValues({})
+  setFocusedField(null)
+}, [coordinates.length])
+```
+
+This prevents stale text values from appearing in wrong inputs when indices shift.
+
+**3. Symbol Button Focus Prevention**
+
+Changed symbol buttons from `onClick` to `onMouseDown` with `preventDefault()`:
+```typescript
+<Button
+  onMouseDown={(e) => {
+    e.preventDefault()  // Prevent blur event
+    insertSymbol(index, 'lat', '°')
+  }}
+>
+  °
+</Button>
+```
+
+This allows users to insert symbols without triggering blur/conversion.
+
+#### Files Modified
+
+- [components/forms/coordinate-point-manager.tsx](components/forms/coordinate-point-manager.tsx)
+  - Added focus state tracking (lines 37-38)
+  - Added useEffect for state cleanup (lines 41-44)
+  - Updated latitude input with focus-aware value (lines 201-228)
+  - Updated longitude input with focus-aware value (lines 292-319)
+  - Changed symbol buttons to use onMouseDown (lines 242-270, 332-360)
+
+#### Verification
+
+Build completed successfully:
+- ✅ All 41 routes generated
+- ✅ Zero TypeScript errors
+- ✅ Coordinate inputs now allow free-form typing
+- ✅ Symbol buttons work without interrupting input
+- ✅ DMS formatting still works on blur
+
+#### User Impact
+
+This fix dramatically improves the coordinate entry experience:
+- Users can now type freely without interruption
+- Copy/paste operations work correctly
+- Symbol buttons can be used mid-entry
+- Clear visual feedback of what mode the input is in (raw text vs formatted DMS)
+
+---
 
 ### Version 2.3 (December 5, 2025)
 

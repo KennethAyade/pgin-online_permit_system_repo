@@ -6,7 +6,7 @@
  * Updated: Support DMS (Degrees-Minutes-Seconds) coordinate format with symbol helpers
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,28 +33,38 @@ export function CoordinatePointManager({
   const [errors, setErrors] = useState<Record<number, string[]>>({})
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
+  // Track which field is currently focused and its text value
+  const [focusedField, setFocusedField] = useState<string | null>(null)
+  const [textValues, setTextValues] = useState<Record<string, string>>({})
+
+  // Clear text values when number of coordinates changes (points added/removed)
+  useEffect(() => {
+    setTextValues({})
+    setFocusedField(null)
+  }, [coordinates.length])
+
   // Insert symbol at cursor position in input
   const insertSymbol = (index: number, field: 'lat' | 'lng', symbol: string) => {
     const inputKey = `${index}-${field}`
     const input = inputRefs.current[inputKey]
     if (!input) return
 
+    // Make sure field is marked as focused
+    setFocusedField(inputKey)
+
     const start = input.selectionStart || 0
     const end = input.selectionEnd || 0
-    const currentValue = input.value
+    const currentValue = textValues[inputKey] ?? input.value
     const newValue = currentValue.substring(0, start) + symbol + currentValue.substring(end)
-    
-    // Update the input value
-    input.value = newValue
-    
+
+    // Update the text value
+    setTextValues(prev => ({ ...prev, [inputKey]: newValue }))
+
     // Move cursor after inserted symbol
     setTimeout(() => {
       input.selectionStart = input.selectionEnd = start + symbol.length
       input.focus()
     }, 0)
-    
-    // Trigger change handler
-    handlePointChange(index, field, newValue)
   }
 
   const handleAddPoint = () => {
@@ -89,12 +99,25 @@ export function CoordinatePointManager({
     field: 'lat' | 'lng',
     value: string
   ) => {
+    // Just update the text value while typing, don't convert yet
+    const inputKey = `${index}-${field}`
+    setTextValues(prev => ({ ...prev, [inputKey]: value }))
+  }
+
+  const handlePointBlur = (
+    index: number,
+    field: 'lat' | 'lng',
+    value: string
+  ) => {
+    const inputKey = `${index}-${field}`
+    setFocusedField(null)
+
     const newCoordinates = [...coordinates]
-    
+
     // Try to parse DMS format first
     const dmsValue = parseDMS(value)
     let numValue: number
-    
+
     if (dmsValue !== null) {
       // Valid DMS format
       numValue = dmsValue
@@ -181,21 +204,29 @@ export function CoordinatePointManager({
                         ref={(el) => { inputRefs.current[`${index}-lat`] = el }}
                         id={`lat-${index}`}
                         type="text"
-                        value={point.lat && point.lat !== 0 ? decimalToDMS(point.lat, true) : ''}
+                        value={
+                          focusedField === `${index}-lat`
+                            ? textValues[`${index}-lat`] ?? ''
+                            : point.lat && point.lat !== 0
+                            ? decimalToDMS(point.lat, true)
+                            : ''
+                        }
                         onChange={(e) =>
                           handlePointChange(index, 'lat', e.target.value)
                         }
-                        onBlur={(e) => {
-                          // Auto-format on blur
-                          const normalized = normalizeDMS(e.target.value, true)
-                          if (normalized && !isReadOnly) {
-                            const decimal = parseDMS(normalized)
-                            if (decimal !== null) {
-                              const newCoords = [...coordinates]
-                              newCoords[index] = { ...newCoords[index], lat: decimal }
-                              onChange(newCoords)
-                            }
+                        onFocus={() => {
+                          const inputKey = `${index}-lat`
+                          setFocusedField(inputKey)
+                          // Initialize text value with current DMS value when focusing
+                          if (!textValues[inputKey]) {
+                            setTextValues(prev => ({
+                              ...prev,
+                              [inputKey]: point.lat && point.lat !== 0 ? decimalToDMS(point.lat, true) : ''
+                            }))
                           }
+                        }}
+                        onBlur={(e) => {
+                          handlePointBlur(index, 'lat', e.target.value)
                         }}
                         disabled={isReadOnly}
                         placeholder="e.g., 18°08'53.19&quot;"
@@ -208,7 +239,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lat', '°')}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lat', '°')
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           °
@@ -217,7 +251,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lat', "'")}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lat', "'")
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           '
@@ -226,7 +263,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lat', '"')}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lat', '"')
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           "
@@ -254,21 +294,29 @@ export function CoordinatePointManager({
                         ref={(el) => { inputRefs.current[`${index}-lng`] = el }}
                         id={`lng-${index}`}
                         type="text"
-                        value={point.lng && point.lng !== 0 ? decimalToDMS(point.lng, false) : ''}
+                        value={
+                          focusedField === `${index}-lng`
+                            ? textValues[`${index}-lng`] ?? ''
+                            : point.lng && point.lng !== 0
+                            ? decimalToDMS(point.lng, false)
+                            : ''
+                        }
                         onChange={(e) =>
                           handlePointChange(index, 'lng', e.target.value)
                         }
-                        onBlur={(e) => {
-                          // Auto-format on blur
-                          const normalized = normalizeDMS(e.target.value, false)
-                          if (normalized && !isReadOnly) {
-                            const decimal = parseDMS(normalized)
-                            if (decimal !== null) {
-                              const newCoords = [...coordinates]
-                              newCoords[index] = { ...newCoords[index], lng: decimal }
-                              onChange(newCoords)
-                            }
+                        onFocus={() => {
+                          const inputKey = `${index}-lng`
+                          setFocusedField(inputKey)
+                          // Initialize text value with current DMS value when focusing
+                          if (!textValues[inputKey]) {
+                            setTextValues(prev => ({
+                              ...prev,
+                              [inputKey]: point.lng && point.lng !== 0 ? decimalToDMS(point.lng, false) : ''
+                            }))
                           }
+                        }}
+                        onBlur={(e) => {
+                          handlePointBlur(index, 'lng', e.target.value)
                         }}
                         disabled={isReadOnly}
                         placeholder="e.g., 120°39'48.90&quot;"
@@ -281,7 +329,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lng', '°')}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lng', '°')
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           °
@@ -290,7 +341,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lng', "'")}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lng', "'")
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           '
@@ -299,7 +353,10 @@ export function CoordinatePointManager({
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => insertSymbol(index, 'lng', '"')}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            insertSymbol(index, 'lng', '"')
+                          }}
                           className="text-xs h-7 px-2"
                         >
                           "
