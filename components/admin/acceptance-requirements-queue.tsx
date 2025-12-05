@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table,
   TableBody,
@@ -184,6 +185,7 @@ export function AdminAcceptanceRequirementsQueue({
           adminRemarks: adminRemarks || undefined,
           adminRemarkFileUrl,
           adminRemarkFileName,
+          isCompliant: reviewDecision === "ACCEPT" ? true : false, // Auto-check compliant on accept
         }),
       })
 
@@ -532,6 +534,58 @@ export function AdminAcceptanceRequirementsQueue({
                   Selected: {adminFile.name}
                 </p>
               )}
+            </div>
+
+            {/* Compliance Checklist (REVISION 4 & 7) */}
+            <div className="space-y-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <Label className="text-sm font-semibold text-gray-900">
+                Document Compliance Evaluation
+              </Label>
+              <p className="text-xs text-gray-600 mb-3">
+                Mark document as compliant or non-compliant. Compliant checkbox will be automatically checked when you click Accept.
+              </p>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="compliant"
+                    checked={decision === "ACCEPT"}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setDecision("ACCEPT")
+                      } else if (decision === "ACCEPT") {
+                        setDecision(null)
+                      }
+                    }}
+                    disabled={submitting}
+                  />
+                  <Label htmlFor="compliant" className="text-sm font-medium text-green-700 cursor-pointer">
+                    ✓ Compliant
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="non-compliant"
+                    checked={decision === "REJECT"}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setDecision("REJECT")
+                      } else if (decision === "REJECT") {
+                        setDecision(null)
+                      }
+                    }}
+                    disabled={submitting}
+                  />
+                  <Label htmlFor="non-compliant" className="text-sm font-medium text-red-700 cursor-pointer">
+                    ✗ Non-compliant
+                  </Label>
+                </div>
+              </div>
+              <Alert className="mt-3 border-blue-200 bg-blue-50">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-xs text-blue-800">
+                  <strong>Auto-Check Feature:</strong> When you click "Accept Requirement" below, the Compliant checkbox will be automatically checked. You only need to manually select "Non-compliant" if rejecting.
+                </AlertDescription>
+              </Alert>
             </div>
 
             {/* Decision Buttons */}

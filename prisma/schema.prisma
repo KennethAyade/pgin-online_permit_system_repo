@@ -22,7 +22,9 @@ enum PermitType {
 
 enum ApplicationStatus {
   DRAFT
-  PENDING_COORDINATE_APPROVAL    // Coordinates submitted, waiting for admin review
+  PENDING_COORDINATE_APPROVAL    // DEPRECATED - keeping for backward compatibility
+  COORDINATE_AUTO_APPROVED       // Coordinates auto-approved (no overlap detected)
+  OVERLAP_DETECTED_PENDING_CONSENT  // Overlap detected, consent letter required
   COORDINATE_REVISION_REQUIRED   // Coordinates rejected, applicant must revise
   SUBMITTED
   ACCEPTANCE_IN_PROGRESS
@@ -269,6 +271,13 @@ model Application {
   coordinateRevisionDeadline DateTime?  // Applicant must revise within 14 working days
   coordinateApprovedAt       DateTime?  // When admin approved coordinates
   coordinateReviewRemarks    String?    @db.Text  // Admin remarks for approval/rejection
+  coordinateAutoApproved     Boolean    @default(false)  // True if auto-approved (no overlap)
+  
+  // Overlap Detection & Consent
+  overlappingProjectIds      Json?      // Array of project IDs that overlap with this application
+  consentLetterUrl           String?    // Uploaded consent letter from existing permit holder
+  consentLetterUploadedAt    DateTime?  // When consent letter was uploaded
+  consentLetterFilename      String?    // Original filename of consent letter
 
   // Application Status
   status       ApplicationStatus @default(DRAFT)
@@ -359,6 +368,11 @@ model AcceptanceRequirement {
   adminRemarks   String?  @db.Text
   adminRemarkFileUrl String?                          // Optional file attached to remarks
   adminRemarkFileName String?
+  
+  // Compliance Tracking (REVISION 4 & 7)
+  isCompliant    Boolean?                             // True = compliant, False = non-compliant, null = not yet reviewed
+  complianceMarkedAt DateTime?                        // When compliance status was set
+  complianceMarkedBy String?                          // Admin who marked compliance
 
   // Deadlines
   revisionDeadline DateTime?                          // 14 days from rejection
@@ -402,6 +416,11 @@ model OtherDocument {
   adminRemarks      String?  @db.Text
   adminRemarkFileUrl String?
   adminRemarkFileName String?
+  
+  // Compliance Tracking (REVISION 8)
+  isCompliant    Boolean?                             // True = compliant, False = non-compliant, null = not yet reviewed
+  complianceMarkedAt DateTime?                        // When compliance status was set
+  complianceMarkedBy String?                          // Admin who marked compliance
 
   // Deadlines
   autoAcceptDeadline DateTime?
@@ -489,6 +508,9 @@ model Comment {
   // Comment Details
   content       String   @db.Text
   commentType   CommentType @default(REMARK)
+  
+  // File Attachments (REVISION 10 - Multiple files support)
+  attachments   Json?    // Array of {fileName: string, fileUrl: string}
   
   // Author
   authorId      String

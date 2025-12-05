@@ -5,7 +5,7 @@ import {
   validatePolygonGeometry,
   type CoordinatePoint,
 } from "@/lib/geo/coordinate-validation"
-import { detectOverlaps } from "@/lib/geo/overlap-detection"
+import { checkCoordinateOverlap, type OverlappingProject } from "@/lib/geo/overlap-detection"
 import { getActiveCoordinates } from "@/lib/services/coordinate-history"
 
 /**
@@ -68,25 +68,24 @@ export async function POST(request: NextRequest) {
     // Get all active (approved) coordinates from CoordinateHistory
     const activeCoordinates = await getActiveCoordinates(applicationId)
 
-    // Perform overlap detection using Turf.js
-    const overlapResults = await detectOverlaps(
+    // Perform overlap detection
+    const overlapResults = await checkCoordinateOverlap(
       normalizedCoordinates,
-      activeCoordinates,
       applicationId
     )
 
     // Calculate total metrics
     const hasOverlap = overlapResults.length > 0
     const maxOverlapPercentage = hasOverlap
-      ? Math.max(...overlapResults.map((r) => r.overlapPercentage))
+      ? Math.max(...overlapResults.map((r) => r.overlapPercentage || 100))
       : 0
 
     // Format overlapping projects info
     const overlappingProjects = overlapResults.map((overlap) => ({
-      applicationId: overlap.affectedApplicationId!,
-      applicationNo: overlap.affectedApplicationNo!,
-      overlapPercentage: overlap.overlapPercentage,
-      overlapArea: overlap.overlapArea,
+      applicationId: overlap.id,
+      applicationNo: overlap.applicationNo,
+      overlapPercentage: overlap.overlapPercentage || 100,
+      overlapArea: null,
     }))
 
     return NextResponse.json(

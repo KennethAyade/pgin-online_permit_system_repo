@@ -9,7 +9,16 @@ import {
   calculateBoundingBox,
   coordinatesToGeoJSON,
 } from '@/lib/geo/polygon-helpers'
-import type { CoordinateData } from '@/lib/geo/overlap-detection'
+
+/**
+ * Coordinate data structure for overlap detection
+ */
+export interface CoordinateData {
+  applicationId: string
+  applicationNo: string
+  coordinates: CoordinatePoint[]
+  bounds: any
+}
 
 /**
  * Create a coordinate history record when admin approves coordinates

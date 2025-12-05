@@ -9,6 +9,10 @@ const createCommentSchema = z.object({
   commentType: z.enum(["REMARK", "CLARIFICATION", "REVISION_REQUEST", "APPROVAL_NOTE", "REJECTION_REASON"]).default("REMARK"),
   parentId: z.string().optional(),
   isInternal: z.boolean().default(false),
+  attachments: z.array(z.object({
+    fileName: z.string(),
+    fileUrl: z.string(),
+  })).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -67,6 +71,7 @@ export async function POST(request: NextRequest) {
         authorName: session.user.name || session.user.email || "Unknown",
         parentId: data.parentId,
         isInternal: data.isInternal,
+        attachments: data.attachments ? JSON.parse(JSON.stringify(data.attachments)) : undefined,
       },
     })
 

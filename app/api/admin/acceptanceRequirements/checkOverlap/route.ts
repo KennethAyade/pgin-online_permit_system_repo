@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
 import { normalizeCoordinates, type CoordinatePoint } from "@/lib/geo/coordinate-validation"
-import { detectOverlaps } from "@/lib/geo/overlap-detection"
+import { checkCoordinateOverlap, type OverlappingProject } from "@/lib/geo/overlap-detection"
 import { getActiveCoordinates } from "@/lib/services/coordinate-history"
 
 /**
@@ -61,39 +61,22 @@ export async function POST(request: NextRequest) {
     // Phase 2.3: This replaces querying AcceptanceRequirement
     const activeCoordinates = await getActiveCoordinates(applicationId)
 
-    // Perform overlap detection using Turf.js
-    // Phase 2.3: Uses bounding box pre-filtering and accurate polygon intersection
-    const overlapResults = await detectOverlaps(
+    // Perform overlap detection
+    const overlapResults = await checkCoordinateOverlap(
       normalizedCoordinates,
-      activeCoordinates,
       applicationId
     )
 
     // Format response for backward compatibility
-    const overlappingProjects = await Promise.all(
-      overlapResults.map(async (overlap) => {
-        // Get application details for each overlap
-        const application = await prisma.application.findUnique({
-          where: { id: overlap.affectedApplicationId! },
-          select: {
-            id: true,
-            applicationNo: true,
-            projectName: true,
-            permitType: true,
-          },
-        })
-
-        return {
-          applicationId: overlap.affectedApplicationId!,
-          applicationNo: overlap.affectedApplicationNo!,
-          projectName: application?.projectName || null,
-          permitType: application?.permitType || '',
-          overlapPercentage: overlap.overlapPercentage,
-          overlapArea: overlap.overlapArea, // in square meters
-          overlapGeoJSON: overlap.overlapGeoJSON,
-        }
-      })
-    )
+    const overlappingProjects = overlapResults.map((overlap) => ({
+      applicationId: overlap.id,
+      applicationNo: overlap.applicationNo,
+      projectName: overlap.projectName,
+      permitType: overlap.permitType,
+      overlapPercentage: overlap.overlapPercentage || 100, // Default if not calculated
+      overlapArea: null, // Not calculated by current function
+      overlapGeoJSON: null, // Not calculated by current function
+    }))
 
     return NextResponse.json(
       {

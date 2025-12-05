@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react"
 import dynamic from "next/dynamic"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Clock, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Clock, CheckCircle, XCircle, AlertTriangle, Upload, FileText } from "lucide-react"
 import { CoordinatePointManager } from "./coordinate-point-manager"
 import { MapSkeleton } from "@/components/map/map-skeleton"
 import {
@@ -26,6 +29,8 @@ interface StepProjectCoordinatesProps {
   onUpdate: (data: any) => void
   applicationStatus?: string
   coordinateReviewRemarks?: string
+  overlappingProjects?: any[]
+  consentLetterUrl?: string
   isReadOnly?: boolean
 }
 
@@ -34,8 +39,13 @@ export function StepProjectCoordinates({
   onUpdate,
   applicationStatus,
   coordinateReviewRemarks,
+  overlappingProjects = [],
+  consentLetterUrl,
   isReadOnly = false
 }: StepProjectCoordinatesProps) {
+  const [consentFile, setConsentFile] = useState<File | null>(null)
+  const [isUploadingConsent, setIsUploadingConsent] = useState(false)
+  const [consentUploadError, setConsentUploadError] = useState<string>("")
   // Initialize coordinates from data (support both old and new formats)
   const [coordinates, setCoordinates] = useState<CoordinatePoint[]>(() => {
     const normalized = normalizeCoordinates(data.projectCoordinates)
@@ -77,30 +87,178 @@ export function StepProjectCoordinates({
     setCoordinates(newCoordinates)
   }
 
+  const handleConsentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type (PDF only)
+      if (file.type !== "application/pdf") {
+        setConsentUploadError("Please upload a PDF file")
+        return
+      }
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setConsentUploadError("File size must be less than 10MB")
+        return
+      }
+      setConsentFile(file)
+      setConsentUploadError("")
+    }
+  }
+
+  const handleConsentUpload = async () => {
+    if (!consentFile) return
+
+    setIsUploadingConsent(true)
+    setConsentUploadError("")
+
+    try {
+      // Upload file
+      const formData = new FormData()
+      formData.append("file", consentFile)
+      formData.append("type", "consent_letter")
+
+      const response = await fetch("/api/documents/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to upload consent letter")
+      }
+
+      const result = await response.json()
+      
+      // Update application with consent letter URL
+      onUpdate({
+        ...data,
+        consentLetterUrl: result.fileUrl,
+        consentLetterFilename: result.fileName,
+      })
+
+      alert("Consent letter uploaded successfully")
+    } catch (error) {
+      console.error("Error uploading consent letter:", error)
+      setConsentUploadError("Failed to upload consent letter. Please try again.")
+    } finally {
+      setIsUploadingConsent(false)
+    }
+  }
+
   // Status display helpers
-  const isPendingApproval = applicationStatus === "PENDING_COORDINATE_APPROVAL"
+  const isPendingApproval = applicationStatus === "PENDING_COORDINATE_APPROVAL" // Deprecated but keep for backward compatibility
+  const isAutoApproved = applicationStatus === "COORDINATE_AUTO_APPROVED"
+  const isOverlapDetected = applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT"
   const isRejected = applicationStatus === "COORDINATE_REVISION_REQUIRED"
-  const isApproved = applicationStatus === "DRAFT" && data.coordinateApprovedAt
+  const isApproved = isAutoApproved || (applicationStatus === "DRAFT" && data.coordinateApprovedAt)
 
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">Project Coordinates</h3>
         <p className="text-sm text-gray-600">
-          Define your project area by entering at least 3 boundary coordinate points. These coordinates will be reviewed by the admin to ensure there is no overlap with existing projects.
+          Define your project area by entering at least 3 boundary coordinate points. Coordinates will be automatically checked for overlap with existing projects and instantly approved if no overlap is detected.
         </p>
       </div>
 
       {/* Status Alerts */}
-      {isPendingApproval && (
-        <Alert className="border-blue-200 bg-blue-50">
-          <Clock className="h-4 w-4 text-blue-700" />
-          <AlertDescription className="text-blue-800 text-sm">
-            <strong>Coordinates Submitted for Review</strong>
+      {isAutoApproved && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle className="h-4 w-4 text-green-700" />
+          <AlertDescription className="text-green-800 text-sm">
+            <strong>Coordinates Auto-Approved</strong>
             <br />
-            Your project coordinates have been submitted for review and you can continue with your application. The admin will verify them in the background, and you'll be notified of any issues within 14 working days.
+            Your project coordinates have been automatically verified with no overlap detected. You can now proceed with the rest of your application.
           </AlertDescription>
         </Alert>
+      )}
+
+      {isOverlapDetected && (
+        <Alert className="border-orange-200 bg-orange-50">
+          <AlertTriangle className="h-4 w-4 text-orange-700" />
+          <AlertDescription className="text-orange-800 text-sm">
+            <strong>Overlap Detected - Consent Letter Required</strong>
+            <br />
+            <span className="block mt-2">
+              Your project area overlaps with the following existing permit(s):
+            </span>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              {overlappingProjects.map((project: any, index: number) => (
+                <li key={index}>
+                  {project.projectName || "Unnamed Project"} ({project.applicationNo}) - {project.permitType}
+                </li>
+              ))}
+            </ul>
+            <span className="block mt-2">
+              Please upload a consent letter from the permit holder(s) to proceed.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Consent Letter Upload */}
+      {isOverlapDetected && !isReadOnly && (
+        <div className="border rounded-lg p-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Upload Consent Letter</h4>
+            <p className="text-xs text-gray-600 mb-3">
+              Upload a consent letter from the existing permit holder(s) authorizing the overlap.
+            </p>
+          </div>
+
+          {consentLetterUrl ? (
+            <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-md">
+              <FileText className="h-5 w-5 text-green-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-900">Consent Letter Uploaded</p>
+                <p className="text-xs text-green-700">Awaiting admin review</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="consent-letter" className="text-sm">
+                  Consent Letter (PDF only, max 10MB)
+                </Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    id="consent-letter"
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleConsentFileChange}
+                    disabled={isUploadingConsent}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleConsentUpload}
+                    disabled={!consentFile || isUploadingConsent}
+                    className="whitespace-nowrap"
+                  >
+                    {isUploadingConsent ? (
+                      <>
+                        <Upload className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {consentFile && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Selected: {consentFile.name}
+                  </p>
+                )}
+              </div>
+
+              {consentUploadError && (
+                <p className="text-sm text-red-600">{consentUploadError}</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {isRejected && (
@@ -133,11 +291,11 @@ export function StepProjectCoordinates({
       )}
 
       {/* Important Notice */}
-      {!isPendingApproval && !isApproved && (
-        <Alert className="border-yellow-200 bg-yellow-50">
-          <AlertTriangle className="h-4 w-4 text-yellow-700" />
-          <AlertDescription className="text-yellow-800 text-sm">
-            <strong>Important:</strong> Your project coordinates will be reviewed by the admin to ensure no overlap with existing projects. You can submit them now and continue with the rest of your application while the review happens in the background.
+      {!isAutoApproved && !isOverlapDetected && !isRejected && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <AlertTriangle className="h-4 w-4 text-blue-700" />
+          <AlertDescription className="text-blue-800 text-sm">
+            <strong>Important:</strong> Your project coordinates will be automatically checked for overlap with existing projects. If no overlap is detected, they will be auto-approved instantly. If overlap is found, you'll need to upload a consent letter from the existing permit holder(s).
           </AlertDescription>
         </Alert>
       )}

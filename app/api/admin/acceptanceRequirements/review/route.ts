@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { requirementId, decision, adminRemarks, adminRemarkFileUrl, adminRemarkFileName } = body
+    const { requirementId, decision, adminRemarks, adminRemarkFileUrl, adminRemarkFileName, isCompliant } = body
 
     if (!requirementId || !decision) {
       return NextResponse.json(
@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
           adminRemarks,
           adminRemarkFileUrl,
           adminRemarkFileName,
+          isCompliant: isCompliant !== undefined ? isCompliant : true, // Default true if accepting
+          complianceMarkedAt: new Date(),
+          complianceMarkedBy: adminUser.id,
         },
       })
 
@@ -181,6 +184,9 @@ export async function POST(request: NextRequest) {
           adminRemarkFileUrl,
           adminRemarkFileName,
           revisionDeadline,
+          isCompliant: isCompliant !== undefined ? isCompliant : false, // Default false if rejecting
+          complianceMarkedAt: new Date(),
+          complianceMarkedBy: adminUser.id,
         },
       })
 

@@ -1,230 +1,248 @@
 /**
- * Overlap Detection Utilities
- * Phase 2.3: Automated overlap detection using Turf.js
+ * Coordinate Overlap Detection
+ * Checks if project coordinates overlap with existing approved projects
  */
 
-import * as turf from '@turf/turf'
+import { prisma } from '@/lib/db'
 import type { CoordinatePoint } from './coordinate-validation'
-import {
-  coordinatesToGeoJSON,
-  calculateBoundingBox,
-  doBoundingBoxesOverlap,
-  type BoundingBox,
-} from './polygon-helpers'
 
-export interface OverlapResult {
-  hasOverlap: boolean
-  affectedApplicationId?: string
-  affectedApplicationNo?: string
-  overlapPercentage: number
-  overlapArea?: number // in square meters
-  overlapGeoJSON?: any // GeoJSON Feature<Polygon>
-}
-
-export interface CoordinateData {
-  applicationId: string
+export interface OverlappingProject {
+  id: string
   applicationNo: string
+  projectName: string | null
+  permitType: string
   coordinates: CoordinatePoint[]
-  bounds: BoundingBox
+  overlapPercentage?: number
 }
 
 /**
- * Check if two polygons overlap using Turf.js
+ * Check if a point is inside a polygon using ray-casting algorithm
  */
-export function checkPolygonOverlap(
-  polygon1: any, // GeoJSON Feature<Polygon>
-  polygon2: any  // GeoJSON Feature<Polygon>
-): {
-  hasOverlap: boolean
-  overlapPercentage: number
-  overlapArea?: number
-  intersection?: any // GeoJSON Feature<Polygon>
-} {
-  // First check if polygons intersect at all
-  const intersects = turf.booleanIntersects(polygon1, polygon2)
+function pointInPolygon(point: CoordinatePoint, polygon: CoordinatePoint[]): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lng
+    const yi = polygon[i].lat
+    const xj = polygon[j].lng
+    const yj = polygon[j].lat
 
-  if (!intersects) {
-    return {
-      hasOverlap: false,
-      overlapPercentage: 0,
-    }
+    const intersect =
+      yi > point.lat !== yj > point.lat &&
+      point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi
+
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+/**
+ * Check if two line segments intersect
+ */
+function segmentsIntersect(
+  p1: CoordinatePoint,
+  p2: CoordinatePoint,
+  p3: CoordinatePoint,
+  p4: CoordinatePoint
+): boolean {
+  const ccw = (a: CoordinatePoint, b: CoordinatePoint, c: CoordinatePoint) => {
+    return (c.lng - a.lng) * (b.lat - a.lat) > (b.lng - a.lng) * (c.lat - a.lat)
   }
 
-  // Calculate intersection polygon
-  const intersection = turf.intersect(
-    turf.featureCollection([polygon1, polygon2])
+  return (
+    ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4)
   )
-
-  if (!intersection) {
-    return {
-      hasOverlap: false,
-      overlapPercentage: 0,
-    }
-  }
-
-  // Calculate areas
-  const area1 = turf.area(polygon1) // in square meters
-  const area2 = turf.area(polygon2)
-  const overlapArea = turf.area(intersection)
-
-  // Calculate overlap percentage relative to the smaller polygon
-  const smallerArea = Math.min(area1, area2)
-  const overlapPercentage = (overlapArea / smallerArea) * 100
-
-  return {
-    hasOverlap: true,
-    overlapPercentage: Math.round(overlapPercentage * 100) / 100, // Round to 2 decimals
-    overlapArea: Math.round(overlapArea * 100) / 100,
-    intersection: intersection as any,
-  }
 }
 
 /**
- * Detect overlaps with existing approved coordinates
- * Uses bounding box pre-filtering for performance
+ * Check if two polygons overlap using various geometric tests
  */
-export async function detectOverlaps(
-  newCoordinates: CoordinatePoint[],
-  existingCoordinates: CoordinateData[],
-  excludeApplicationId?: string
-): Promise<OverlapResult[]> {
-  const overlaps: OverlapResult[] = []
-
-  // Convert new coordinates to GeoJSON
-  const newPolygon = coordinatesToGeoJSON(newCoordinates, {
-    type: 'new',
-  })
-
-  // Calculate bounding box for new polygon
-  const newBounds = calculateBoundingBox(newCoordinates)
-
-  // Filter candidates using bounding box (fast pre-check)
-  const candidates = existingCoordinates.filter((existing) => {
-    // Skip if it's the same application
-    if (excludeApplicationId && existing.applicationId === excludeApplicationId) {
-      return false
+function polygonsOverlap(
+  polygon1: CoordinatePoint[],
+  polygon2: CoordinatePoint[]
+): boolean {
+  // Test 1: Check if any vertex of polygon1 is inside polygon2
+  for (const point of polygon1) {
+    if (pointInPolygon(point, polygon2)) {
+      return true
     }
+  }
 
-    // Quick bounding box check
-    return doBoundingBoxesOverlap(newBounds, existing.bounds)
-  })
+  // Test 2: Check if any vertex of polygon2 is inside polygon1
+  for (const point of polygon2) {
+    if (pointInPolygon(point, polygon1)) {
+      return true
+    }
+  }
 
-  // Detailed polygon overlap check for candidates
-  for (const candidate of candidates) {
-    const existingPolygon = coordinatesToGeoJSON(candidate.coordinates, {
-      applicationId: candidate.applicationId,
-      applicationNo: candidate.applicationNo,
+  // Test 3: Check if any edges intersect
+  for (let i = 0; i < polygon1.length; i++) {
+    const p1 = polygon1[i]
+    const p2 = polygon1[(i + 1) % polygon1.length]
+
+    for (let j = 0; j < polygon2.length; j++) {
+      const p3 = polygon2[j]
+      const p4 = polygon2[(j + 1) % polygon2.length]
+
+      if (segmentsIntersect(p1, p2, p3, p4)) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
+ * Calculate bounding box for a set of coordinates
+ */
+function calculateBounds(coordinates: CoordinatePoint[]): {
+  minLat: number
+  maxLat: number
+  minLng: number
+  maxLng: number
+} {
+  if (coordinates.length === 0) {
+    return { minLat: 0, maxLat: 0, minLng: 0, maxLng: 0 }
+  }
+
+  let minLat = coordinates[0].lat
+  let maxLat = coordinates[0].lat
+  let minLng = coordinates[0].lng
+  let maxLng = coordinates[0].lng
+
+  for (const coord of coordinates) {
+    minLat = Math.min(minLat, coord.lat)
+    maxLat = Math.max(maxLat, coord.lat)
+    minLng = Math.min(minLng, coord.lng)
+    maxLng = Math.max(maxLng, coord.lng)
+  }
+
+  return { minLat, maxLat, minLng, maxLng }
+}
+
+/**
+ * Check if two bounding boxes overlap (quick pre-filter)
+ */
+function boundsOverlap(
+  bounds1: ReturnType<typeof calculateBounds>,
+  bounds2: ReturnType<typeof calculateBounds>
+): boolean {
+  return !(
+    bounds1.maxLat < bounds2.minLat ||
+    bounds1.minLat > bounds2.maxLat ||
+    bounds1.maxLng < bounds2.minLng ||
+    bounds1.minLng > bounds2.maxLng
+  )
+}
+
+/**
+ * Check for coordinate overlap with existing approved projects
+ * @param coordinates - New project coordinates to check
+ * @param excludeApplicationId - Optional application ID to exclude from check (for updates)
+ * @returns Array of overlapping projects
+ */
+export async function checkCoordinateOverlap(
+  coordinates: CoordinatePoint[],
+  excludeApplicationId?: string
+): Promise<OverlappingProject[]> {
+  try {
+    // Calculate bounding box for quick filtering
+    const newBounds = calculateBounds(coordinates)
+
+    // Get all approved applications with coordinates
+    // Include: COORDINATE_AUTO_APPROVED, SUBMITTED, APPROVED, PERMIT_ISSUED
+    const approvedApplications = await prisma.application.findMany({
+      where: {
+        AND: [
+          {
+            id: excludeApplicationId ? { not: excludeApplicationId } : undefined,
+          },
+          {
+            OR: [
+              { status: 'COORDINATE_AUTO_APPROVED' },
+              { status: 'SUBMITTED' },
+              { status: 'ACCEPTANCE_IN_PROGRESS' },
+              { status: 'UNDER_REVIEW' },
+              { status: 'APPROVED' },
+              { status: 'PERMIT_ISSUED' },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        applicationNo: true,
+        projectName: true,
+        permitType: true,
+        projectCoordinates: true,
+      },
     })
 
-    const overlapCheck = checkPolygonOverlap(newPolygon, existingPolygon)
+    const overlappingProjects: OverlappingProject[] = []
 
-    if (overlapCheck.hasOverlap) {
-      overlaps.push({
-        hasOverlap: true,
-        affectedApplicationId: candidate.applicationId,
-        affectedApplicationNo: candidate.applicationNo,
-        overlapPercentage: overlapCheck.overlapPercentage,
-        overlapArea: overlapCheck.overlapArea,
-        overlapGeoJSON: overlapCheck.intersection,
-      })
+    // Check each approved project for overlap
+    for (const app of approvedApplications) {
+      try {
+        // Parse coordinates (support both array and object formats)
+        let appCoordinates: CoordinatePoint[] = []
+
+        if (Array.isArray(app.projectCoordinates)) {
+          appCoordinates = app.projectCoordinates as unknown as CoordinatePoint[]
+        } else if (app.projectCoordinates && typeof app.projectCoordinates === 'object') {
+          // Old format: {point1: {latitude, longitude}, ...}
+          const coordObj = app.projectCoordinates as any
+          for (let i = 1; i <= 10; i++) {
+            const pointKey = `point${i}`
+            if (coordObj[pointKey]) {
+              appCoordinates.push({
+                lat: coordObj[pointKey].latitude || coordObj[pointKey].lat,
+                lng: coordObj[pointKey].longitude || coordObj[pointKey].lng,
+              })
+            }
+          }
+        }
+
+        if (appCoordinates.length < 3) continue
+
+        // Quick bounding box check
+        const appBounds = calculateBounds(appCoordinates)
+        if (!boundsOverlap(newBounds, appBounds)) {
+          continue
+        }
+
+        // Detailed polygon overlap check
+        if (polygonsOverlap(coordinates, appCoordinates)) {
+          overlappingProjects.push({
+            id: app.id,
+            applicationNo: app.applicationNo,
+            projectName: app.projectName,
+            permitType: app.permitType,
+            coordinates: appCoordinates,
+          })
+        }
+      } catch (error) {
+        console.error(`Error checking overlap for application ${app.id}:`, error)
+        // Continue checking other applications
+      }
     }
-  }
 
-  return overlaps
-}
-
-/**
- * Calculate total overlap area across multiple overlapping polygons
- */
-export function calculateTotalOverlapArea(overlaps: OverlapResult[]): number {
-  return overlaps.reduce((total, overlap) => {
-    return total + (overlap.overlapArea || 0)
-  }, 0)
-}
-
-/**
- * Get the maximum overlap percentage from multiple overlaps
- */
-export function getMaxOverlapPercentage(overlaps: OverlapResult[]): number {
-  if (overlaps.length === 0) return 0
-
-  return Math.max(...overlaps.map((overlap) => overlap.overlapPercentage))
-}
-
-/**
- * Check if overlap percentage exceeds threshold
- */
-export function isSignificantOverlap(
-  overlapPercentage: number,
-  threshold: number = 1 // 1% threshold by default
-): boolean {
-  return overlapPercentage >= threshold
-}
-
-/**
- * Format overlap information for display
- */
-export function formatOverlapInfo(overlap: OverlapResult): string {
-  const { affectedApplicationNo, overlapPercentage, overlapArea } = overlap
-
-  let info = `Application ${affectedApplicationNo}: ${overlapPercentage}% overlap`
-
-  if (overlapArea) {
-    // Convert to hectares if area is large
-    if (overlapArea > 10000) {
-      const hectares = (overlapArea / 10000).toFixed(2)
-      info += ` (${hectares} hectares)`
-    } else {
-      info += ` (${overlapArea.toFixed(2)} m²)`
-    }
-  }
-
-  return info
-}
-
-/**
- * Validate polygon area meets minimum requirement
- */
-export function validateMinimumArea(
-  coordinates: CoordinatePoint[],
-  minimumAreaInSquareMeters: number = 1000 // 1000 m² default (0.1 hectare)
-): { isValid: boolean; area: number; message?: string } {
-  const polygon = coordinatesToGeoJSON(coordinates)
-  const area = turf.area(polygon)
-
-  if (area < minimumAreaInSquareMeters) {
-    return {
-      isValid: false,
-      area,
-      message: `Project area (${area.toFixed(2)} m²) is below minimum requirement (${minimumAreaInSquareMeters} m²)`,
-    }
-  }
-
-  return {
-    isValid: true,
-    area,
-  }
-}
-
-/**
- * Check if polygon is convex (all interior angles < 180°)
- * Convex polygons are simpler and less likely to have issues
- */
-export function isConvexPolygon(coordinates: CoordinatePoint[]): boolean {
-  const polygon = coordinatesToGeoJSON(coordinates)
-
-  try {
-    // A polygon is convex if it equals its convex hull
-    const hull = turf.convex(turf.featureCollection([polygon]))
-
-    if (!hull) return false
-
-    const originalArea = turf.area(polygon)
-    const hullArea = turf.area(hull)
-
-    // Allow small floating-point differences
-    return Math.abs(originalArea - hullArea) < 0.01
+    return overlappingProjects
   } catch (error) {
-    return false
+    console.error('Error in checkCoordinateOverlap:', error)
+    throw new Error('Failed to check coordinate overlap')
   }
+}
+
+/**
+ * Format overlapping projects for display
+ */
+export function formatOverlappingProjects(projects: OverlappingProject[]): string {
+  if (projects.length === 0) return 'No overlapping projects found.'
+
+  return projects
+    .map((p, index) => {
+      const name = p.projectName || 'Unnamed Project'
+      return `${index + 1}. ${name} (${p.applicationNo}) - ${p.permitType}`
+    })
+    .join('\n')
 }

@@ -3,17 +3,17 @@
 /**
  * Coordinate Point Manager Component
  * Phase 2.1: Dynamic add/remove coordinate points (min 3, unlimited)
- * Updated: Support DMS (Degrees-Minutes-Seconds) coordinate format
+ * Updated: Support DMS (Degrees-Minutes-Seconds) coordinate format with symbol helpers
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Plus, Trash2, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { CoordinatePoint } from '@/lib/geo/coordinate-validation'
 import { validateCoordinatePoint } from '@/lib/geo/coordinate-validation'
-import { parseDMS, decimalToDMS, validateDMSCoordinate } from '@/lib/geo/dms-utils'
+import { parseDMS, decimalToDMS, validateDMSCoordinate, normalizeDMS } from '@/lib/geo/dms-utils'
 
 interface CoordinatePointManagerProps {
   coordinates: CoordinatePoint[]
@@ -31,6 +31,31 @@ export function CoordinatePointManager({
   maxPoints = 100,
 }: CoordinatePointManagerProps) {
   const [errors, setErrors] = useState<Record<number, string[]>>({})
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  // Insert symbol at cursor position in input
+  const insertSymbol = (index: number, field: 'lat' | 'lng', symbol: string) => {
+    const inputKey = `${index}-${field}`
+    const input = inputRefs.current[inputKey]
+    if (!input) return
+
+    const start = input.selectionStart || 0
+    const end = input.selectionEnd || 0
+    const currentValue = input.value
+    const newValue = currentValue.substring(0, start) + symbol + currentValue.substring(end)
+    
+    // Update the input value
+    input.value = newValue
+    
+    // Move cursor after inserted symbol
+    setTimeout(() => {
+      input.selectionStart = input.selectionEnd = start + symbol.length
+      input.focus()
+    }, 0)
+    
+    // Trigger change handler
+    handlePointChange(index, field, newValue)
+  }
 
   const handleAddPoint = () => {
     if (coordinates.length >= maxPoints) {
@@ -149,22 +174,71 @@ export function CoordinatePointManager({
                   <Label htmlFor={`lat-${index}`} className="text-sm">
                     Latitude
                   </Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id={`lat-${index}`}
-                      type="text"
-                      value={point.lat && point.lat !== 0 ? decimalToDMS(point.lat, true) : ''}
-                      onChange={(e) =>
-                        handlePointChange(index, 'lat', e.target.value)
-                      }
-                      disabled={isReadOnly}
-                      placeholder="e.g., 18°08'53.19&quot;"
-                      className="pl-10"
-                    />
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        ref={(el) => { inputRefs.current[`${index}-lat`] = el }}
+                        id={`lat-${index}`}
+                        type="text"
+                        value={point.lat && point.lat !== 0 ? decimalToDMS(point.lat, true) : ''}
+                        onChange={(e) =>
+                          handlePointChange(index, 'lat', e.target.value)
+                        }
+                        onBlur={(e) => {
+                          // Auto-format on blur
+                          const normalized = normalizeDMS(e.target.value, true)
+                          if (normalized && !isReadOnly) {
+                            const decimal = parseDMS(normalized)
+                            if (decimal !== null) {
+                              const newCoords = [...coordinates]
+                              newCoords[index] = { ...newCoords[index], lat: decimal }
+                              onChange(newCoords)
+                            }
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        placeholder="e.g., 18°08'53.19&quot;"
+                        className="pl-10"
+                      />
+                    </div>
+                    {!isReadOnly && (
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lat', '°')}
+                          className="text-xs h-7 px-2"
+                        >
+                          °
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lat', "'")}
+                          className="text-xs h-7 px-2"
+                        >
+                          '
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lat', '"')}
+                          className="text-xs h-7 px-2"
+                        >
+                          "
+                        </Button>
+                        <span className="text-xs text-muted-foreground ml-2 flex items-center">
+                          Click symbols or type: 18 08 53.19
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Format: DD°MM'SS.SS&quot;
+                    Format: DD°MM'SS.SS&quot; (or space-separated)
                   </p>
                 </div>
 
@@ -173,22 +247,71 @@ export function CoordinatePointManager({
                   <Label htmlFor={`lng-${index}`} className="text-sm">
                     Longitude
                   </Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id={`lng-${index}`}
-                      type="text"
-                      value={point.lng && point.lng !== 0 ? decimalToDMS(point.lng, false) : ''}
-                      onChange={(e) =>
-                        handlePointChange(index, 'lng', e.target.value)
-                      }
-                      disabled={isReadOnly}
-                      placeholder="e.g., 120°39'48.90&quot;"
-                      className="pl-10"
-                    />
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        ref={(el) => { inputRefs.current[`${index}-lng`] = el }}
+                        id={`lng-${index}`}
+                        type="text"
+                        value={point.lng && point.lng !== 0 ? decimalToDMS(point.lng, false) : ''}
+                        onChange={(e) =>
+                          handlePointChange(index, 'lng', e.target.value)
+                        }
+                        onBlur={(e) => {
+                          // Auto-format on blur
+                          const normalized = normalizeDMS(e.target.value, false)
+                          if (normalized && !isReadOnly) {
+                            const decimal = parseDMS(normalized)
+                            if (decimal !== null) {
+                              const newCoords = [...coordinates]
+                              newCoords[index] = { ...newCoords[index], lng: decimal }
+                              onChange(newCoords)
+                            }
+                          }
+                        }}
+                        disabled={isReadOnly}
+                        placeholder="e.g., 120°39'48.90&quot;"
+                        className="pl-10"
+                      />
+                    </div>
+                    {!isReadOnly && (
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lng', '°')}
+                          className="text-xs h-7 px-2"
+                        >
+                          °
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lng', "'")}
+                          className="text-xs h-7 px-2"
+                        >
+                          '
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => insertSymbol(index, 'lng', '"')}
+                          className="text-xs h-7 px-2"
+                        >
+                          "
+                        </Button>
+                        <span className="text-xs text-muted-foreground ml-2 flex items-center">
+                          Click symbols or type: 120 39 48.90
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Format: DD°MM'SS.SS&quot;
+                    Format: DD°MM'SS.SS&quot; (or space-separated)
                   </p>
                 </div>
               </div>

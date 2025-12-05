@@ -35,8 +35,11 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   const progress = (currentStep / totalSteps) * 100
 
   // Check if coordinates are approved (can proceed beyond Step 2)
-  const coordinatesApproved = applicationStatus === "DRAFT" && formData.coordinateApprovedAt
-  const coordinatesPending = applicationStatus === "PENDING_COORDINATE_APPROVAL"
+  const coordinatesApproved = 
+    applicationStatus === "COORDINATE_AUTO_APPROVED" ||
+    (applicationStatus === "DRAFT" && formData.coordinateApprovedAt)
+  const coordinatesPending = applicationStatus === "PENDING_COORDINATE_APPROVAL" // Deprecated
+  const coordinatesOverlapDetected = applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT"
   const coordinatesRejected = applicationStatus === "COORDINATE_REVISION_REQUIRED"
 
   // Initialize form data from initialData when it changes
@@ -135,11 +138,26 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
         return
       }
 
-      // Update local status
-      setApplicationStatus("PENDING_COORDINATE_APPROVAL")
-      // Auto-advance to next step instead of blocking
-      setCurrentStep(currentStep + 1)
-      alert("Coordinates submitted for review! You can continue with your application.")
+      // Update local status and form data
+      setApplicationStatus(result.status)
+      setFormData({
+        ...formData,
+        coordinateAutoApproved: result.autoApproved,
+        overlappingProjectIds: result.overlappingProjects?.map((p: any) => p.id),
+      })
+
+      // Show appropriate message based on result
+      if (result.autoApproved) {
+        alert("✓ Coordinates auto-approved! No overlap detected. You can continue with your application.")
+        // Auto-advance to next step
+        setCurrentStep(currentStep + 1)
+      } else if (result.overlappingProjects && result.overlappingProjects.length > 0) {
+        alert(`⚠ Overlap detected with ${result.overlappingProjects.length} existing project(s). Please upload a consent letter to proceed.`)
+        // Stay on current step to upload consent
+      } else {
+        alert("Coordinates submitted for review! You can continue with your application.")
+        setCurrentStep(currentStep + 1)
+      }
     } catch (error) {
       console.error("Error submitting coordinates:", error)
       alert("An error occurred while submitting coordinates")
@@ -416,15 +434,24 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
                 </Button>
               )}
 
-              {/* Next Button */}
+              {/* Next Button / Submit for Review Button */}
               {currentStep < totalSteps && (
                 <Button
                   onClick={handleNext}
                   disabled={isNextDisabled()}
                   className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 text-white disabled:opacity-50"
                 >
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
+                  {currentStep === APPLICATION_STEPS.ACCEPTANCE_DOCS ? (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Submit for Review
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
                 </Button>
               )}
 

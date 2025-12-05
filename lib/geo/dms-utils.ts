@@ -35,23 +35,61 @@ export function validateDMSFormat(dmsString: string): boolean {
 }
 
 /**
- * Parse DMS string to decimal degrees
- * @param dmsString - String in DMS format (e.g., "18°08'53.19"")
+ * Parse DMS string to decimal degrees (supports multiple formats)
+ * @param dmsString - String in various DMS formats
  * @returns Decimal degrees or null if invalid
+ * 
+ * Supported formats:
+ * - Standard: 18°08'53.19"
+ * - Alternative: 18d08m53.19s
+ * - Space-separated: 18 08 53.19
+ * - Mixed: 18° 08' 53.19"
  */
 export function parseDMS(dmsString: string): number | null {
   if (!dmsString || typeof dmsString !== 'string') {
     return null
   }
 
-  const match = dmsString.trim().match(DMS_PATTERN)
-  if (!match) {
-    return null
+  const trimmed = dmsString.trim()
+  
+  // Try multiple patterns in order of specificity
+  const patterns = [
+    // Standard: 18°08'53.19"
+    /^(\d{1,3})[°]\s*(\d{1,2})['′]\s*([\d.]+)[\"″]$/,
+    // Alternative with d/m/s: 18d08m53.19s
+    /^(\d{1,3})d\s*(\d{1,2})m\s*([\d.]+)s$/i,
+    // Space-separated: 18 08 53.19
+    /^(\d{1,3})\s+(\d{1,2})\s+([\d.]+)$/,
+    // Degrees and minutes only: 18°08' or 18d08m
+    /^(\d{1,3})[°d]\s*(\d{1,2})['′m]$/i,
+    // Degrees only: 18° or 18d
+    /^(\d{1,3})[°d]$/i,
+  ]
+
+  let match = null
+  let degrees = 0
+  let minutes = 0
+  let seconds = 0
+
+  // Try each pattern
+  for (const pattern of patterns) {
+    match = trimmed.match(pattern)
+    if (match) {
+      degrees = parseInt(match[1], 10)
+      minutes = match[2] ? parseInt(match[2], 10) : 0
+      seconds = match[3] ? parseFloat(match[3]) : 0
+      break
+    }
   }
 
-  const degrees = parseInt(match[1], 10)
-  const minutes = parseInt(match[2], 10)
-  const seconds = parseFloat(match[3])
+  // If no pattern matched, try parsing as plain decimal
+  if (!match) {
+    const decimalValue = parseFloat(trimmed)
+    if (!isNaN(decimalValue) && decimalValue >= -180 && decimalValue <= 180) {
+      return Math.round(decimalValue * 1000000) / 1000000
+    }
+    return null
+  }
 
   // Validate ranges
   if (degrees < 0 || degrees > 180) return null
@@ -169,4 +207,23 @@ export function validateDMSCoordinate(
 export function lookLikeDMS(value: string): boolean {
   return /[°'""]/.test(value)
 }
+
+/**
+ * Normalize/format DMS string to standard format
+ * Accepts various inputs and converts to: DD°MM'SS.SS"
+ * @param dmsString - String in any DMS format
+ * @param isLatitude - Whether this is latitude (for validation)
+ * @returns Standardized DMS string or null if invalid
+ */
+export function normalizeDMS(dmsString: string, isLatitude: boolean = false): string | null {
+  // First parse the input
+  const decimal = parseDMS(dmsString)
+  if (decimal === null) {
+    return null
+  }
+
+  // Convert back to standard DMS format
+  return decimalToDMS(decimal, isLatitude)
+}
+
 
