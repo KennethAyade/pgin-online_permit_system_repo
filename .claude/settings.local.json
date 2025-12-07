@@ -30,7 +30,8 @@
       "Bash(tasklist:*)",
       "Bash(if exist \".next\" rd /s /q \".next\")",
       "Bash(npx next:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

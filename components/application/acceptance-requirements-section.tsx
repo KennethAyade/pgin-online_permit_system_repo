@@ -215,6 +215,8 @@ export function AcceptanceRequirementsSection({
         const formData = new FormData()
         formData.append("file", submissionFile)
         formData.append("applicationId", applicationId)
+        formData.append("documentType", selectedRequirement.requirementType)
+        formData.append("documentName", selectedRequirement.requirementName)
 
         const uploadResponse = await fetch("/api/documents/upload", {
           method: "POST",
@@ -222,11 +224,12 @@ export function AcceptanceRequirementsSection({
         })
 
         if (!uploadResponse.ok) {
-          throw new Error("File upload failed")
+          const errorData = await uploadResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || "File upload failed")
         }
 
         const uploadResult = await uploadResponse.json()
-        submittedFileUrl = uploadResult.fileUrl
+        submittedFileUrl = uploadResult.document.fileUrl
         submittedFileName = submissionFile.name
       }
 
