@@ -31,7 +31,9 @@
       "Bash(if exist \".next\" rd /s /q \".next\")",
       "Bash(npx next:*)",
       "Bash(grep:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(npx tsx:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
