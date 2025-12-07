@@ -104,7 +104,40 @@ export function AcceptanceRequirementsSection({
       const response = await fetch(`/api/acceptanceRequirements/${applicationId}?type=user`)
       const result = await response.json()
 
-      if (result.requirements) {
+      // If no requirements exist, initialize them automatically
+      if (!result.requirements || result.requirements.length === 0) {
+        try {
+          const initResponse = await fetch('/api/acceptanceRequirements/initialize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ applicationId }),
+          })
+
+          if (initResponse.ok) {
+            // Fetch requirements again after initialization
+            const secondResponse = await fetch(`/api/acceptanceRequirements/${applicationId}?type=user`)
+            const secondResult = await secondResponse.json()
+
+            if (secondResult.requirements) {
+              setRequirements(secondResult.requirements)
+              const firstPending = secondResult.requirements.find(
+                (r: any) => r.status === "PENDING_SUBMISSION" || r.status === "REVISION_REQUIRED"
+              )
+              if (firstPending) {
+                setSelectedRequirement(firstPending)
+              } else if (secondResult.requirements.length > 0) {
+                setSelectedRequirement(secondResult.requirements[0])
+              }
+            }
+          } else {
+            // If initialization fails (e.g., already initialized), just use the empty result
+            setRequirements([])
+          }
+        } catch (initErr) {
+          console.error("Failed to initialize requirements:", initErr)
+          setError("Failed to initialize acceptance requirements. Please refresh the page.")
+        }
+      } else if (result.requirements) {
         setRequirements(result.requirements)
         // Auto-select first non-accepted requirement or first requirement
         const firstPending = result.requirements.find(
