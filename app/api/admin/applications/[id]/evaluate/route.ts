@@ -107,6 +107,41 @@ export async function POST(
       },
     })
 
+    // Update AcceptanceRequirement records with compliance data
+    // Map document labels to requirement types
+    const DOCUMENT_LABEL_TO_TYPE: Record<string, string> = {
+      "Application Form (MGB Form 8-4)": "APPLICATION_FORM",
+      "Survey Plan": "SURVEY_PLAN",
+      "Location Map": "LOCATION_MAP",
+      "Work Program": "WORK_PROGRAM",
+      "IEE Report": "IEE_REPORT",
+      "EPEP": "EPEP",
+      "Proof of Technical Competence": "PROOF_TECHNICAL_COMPETENCE",
+      "Proof of Financial Capability": "PROOF_FINANCIAL_CAPABILITY",
+      "Articles of Incorporation": "ARTICLES_INCORPORATION",
+      "Other Supporting Papers": "OTHER_SUPPORTING_PAPERS",
+    }
+
+    // Update compliance for each checklist item
+    for (const item of data.checklistItems) {
+      const requirementType = DOCUMENT_LABEL_TO_TYPE[item.itemName] as any
+
+      if (requirementType) {
+        // Find and update the matching AcceptanceRequirement
+        await prisma.acceptanceRequirement.updateMany({
+          where: {
+            applicationId: id,
+            requirementType,
+          },
+          data: {
+            isCompliant: item.isCompliant,
+            complianceMarkedAt: new Date(),
+            complianceMarkedBy: session.user.id,
+          },
+        })
+      }
+    }
+
     // Update application status based on evaluation type
     let newStatus = application.status
     if (data.evaluationType === "INITIAL_CHECK") {

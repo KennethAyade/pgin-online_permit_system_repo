@@ -89,9 +89,7 @@ export async function POST(request: NextRequest) {
           adminRemarks,
           adminRemarkFileUrl,
           adminRemarkFileName,
-          isCompliant: isCompliant !== undefined ? isCompliant : true, // Default true if accepting
-          complianceMarkedAt: new Date(),
-          complianceMarkedBy: adminUser.id,
+          // Compliance will be set during evaluation step (EvaluationChecklist)
         },
       })
 
@@ -184,9 +182,7 @@ export async function POST(request: NextRequest) {
           adminRemarkFileUrl,
           adminRemarkFileName,
           revisionDeadline,
-          isCompliant: isCompliant !== undefined ? isCompliant : false, // Default false if rejecting
-          complianceMarkedAt: new Date(),
-          complianceMarkedBy: adminUser.id,
+          // Compliance will be set during evaluation step (EvaluationChecklist)
         },
       })
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -49,10 +49,45 @@ export function EvaluationChecklist({
   const [summary, setSummary] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [acceptanceRequirements, setAcceptanceRequirements] = useState<any[]>([])
 
   const requirements = permitType === "ISAG"
     ? DOCUMENT_REQUIREMENTS.ISAG.acceptance
     : DOCUMENT_REQUIREMENTS.CSAG.acceptance
+
+  // Fetch acceptance requirements when dialog opens
+  useEffect(() => {
+    if (open && applicationId) {
+      fetchAcceptanceRequirements()
+    }
+  }, [open, applicationId])
+
+  const fetchAcceptanceRequirements = async () => {
+    try {
+      const response = await fetch(`/api/acceptanceRequirements/${applicationId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAcceptanceRequirements(data.requirements || [])
+
+        // Pre-fill checklist for ACCEPTED requirements
+        const prefilledChecklist: Record<string, { isComplete: boolean; isCompliant?: boolean; remarks?: string }> = {}
+
+        data.requirements?.forEach((req: any) => {
+          if (req.status === "ACCEPTED") {
+            prefilledChecklist[req.requirementType] = {
+              isComplete: true,
+              isCompliant: req.isCompliant ?? undefined,
+              remarks: req.adminRemarks || undefined,
+            }
+          }
+        })
+
+        setChecklist(prefilledChecklist)
+      }
+    } catch (err) {
+      console.error("Failed to fetch acceptance requirements:", err)
+    }
+  }
 
   const handleSubmit = async () => {
     const checklistItems = requirements.map((docType, index) => ({
