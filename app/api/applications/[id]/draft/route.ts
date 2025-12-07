@@ -50,8 +50,15 @@ export async function PUT(
       )
     }
 
-    // Only allow draft updates to DRAFT applications
-    if (existingApplication.status !== "DRAFT") {
+    // Allow draft updates for applications that can be edited
+    const editableStatuses = [
+      "DRAFT",                      // Initial creation
+      "RETURNED",                   // Returned for revisions
+      "FOR_ACTION",                 // Awaiting applicant action
+      "COORDINATE_REVISION_REQUIRED" // Coordinates need revision
+    ] as const
+
+    if (!editableStatuses.includes(existingApplication.status as any)) {
       return NextResponse.json(
         { error: "Cannot update submitted application" },
         { status: 400 }

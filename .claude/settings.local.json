@@ -29,7 +29,8 @@
       "Bash(git commit:*)",
       "Bash(tasklist:*)",
       "Bash(if exist \".next\" rd /s /q \".next\")",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 2.5
+**Document Version**: 2.5.1
 **Last Updated**: 2025-12-07
-**Status**: Production Ready (Security Patched)
-**Latest Update**: Critical Security Fix - Updated Next.js from 16.0.3 to 16.0.7 to address CVE-2025-55182 (CVSS 10.0), a critical RCE vulnerability in React Server Components. Also fixed document upload issues preventing consent letter uploads and acceptance requirement submissions in production.
+**Status**: Production Ready (Security Patched + Production Fixes)
+**Latest Update**: Production Bug Fixes - Fixed document upload failures and auto-save errors by correcting allowed application statuses. Removed non-existent PENDING_COORDINATES status and added ACCEPTANCE_IN_PROGRESS and PENDING_OTHER_DOCUMENTS statuses. Users can now upload documents during acceptance requirements review.
 
 ---
 
@@ -1375,6 +1375,127 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 2.5.1 (December 7, 2025)
+
+**Production Status Validation Fixes** 🔧
+
+This version fixes critical production issues where document uploads and auto-save were failing due to incorrect application status validation.
+
+#### Problems Fixed
+
+**1. Document Upload Failures (Status Validation)**
+
+**Problem:**
+- Users unable to upload acceptance requirement documents
+- Error: "Cannot upload documents for this application status"
+- Upload failures in production with multiple 400 errors
+
+**Root Cause:**
+- `PENDING_COORDINATES` status included in allowed list but **doesn't exist** in Prisma schema
+- Missing `ACCEPTANCE_IN_PROGRESS` - the actual status during acceptance requirements review
+- Missing `PENDING_OTHER_DOCUMENTS` - status when uploading other required documents
+
+**Solution:**
+- **Removed:** `PENDING_COORDINATES` (non-existent status)
+- **Added:** `ACCEPTANCE_IN_PROGRESS` - allows uploads during acceptance requirements
+- **Added:** `PENDING_OTHER_DOCUMENTS` - allows uploads for other documents
+
+**Updated Allowed Statuses:**
+```typescript
+const allowedStatuses = [
+  "DRAFT",                                  // Initial creation
+  "RETURNED",                               // Returned for revisions
+  "FOR_ACTION",                             // Awaiting applicant action
+  "OVERLAP_DETECTED_PENDING_CONSENT",       // Uploading consent letters
+  "COORDINATE_REVISION_REQUIRED",           // Resubmitting coordinates
+  "ACCEPTANCE_IN_PROGRESS",                 // ✅ NEW: During acceptance requirements review
+  "PENDING_OTHER_DOCUMENTS",                // ✅ NEW: Uploading other documents
+] as const
+```
+
+---
+
+**2. Auto-Save 400 Errors (Draft Endpoint)**
+
+**Problem:**
+- Application Wizard auto-saves every 2 seconds
+- When viewing non-DRAFT applications, auto-save continuously failed with 400 errors
+- Degraded user experience with errors in Vercel logs
+
+**Root Cause:**
+- Draft endpoint only allowed updates for applications in `DRAFT` status
+- When users view applications in `ACCEPTANCE_IN_PROGRESS`, `RETURNED`, or `FOR_ACTION` status, auto-save fails
+
+**Solution:**
+- Expanded allowed statuses for draft updates to include editable application states
+- Allows auto-save to work correctly during normal workflows
+
+**Updated Editable Statuses:**
+```typescript
+const editableStatuses = [
+  "DRAFT",                      // Initial creation
+  "RETURNED",                   // ✅ NEW: Returned for revisions
+  "FOR_ACTION",                 // ✅ NEW: Awaiting applicant action
+  "COORDINATE_REVISION_REQUIRED" // ✅ NEW: Coordinates need revision
+] as const
+```
+
+#### Files Modified
+
+1. **[app/api/documents/upload/route.ts](app/api/documents/upload/route.ts:50-65)**
+   - Fixed allowed statuses array (lines 51-59)
+   - Removed `PENDING_COORDINATES` (doesn't exist in schema)
+   - Added `ACCEPTANCE_IN_PROGRESS` for acceptance requirements uploads
+   - Added `PENDING_OTHER_DOCUMENTS` for other document uploads
+
+2. **[app/api/applications/[id]/draft/route.ts](app/api/applications/[id]/draft/route.ts:53-66)**
+   - Expanded editable statuses check (lines 54-61)
+   - Changed from single-status to multi-status validation
+   - Allows auto-save for RETURNED, FOR_ACTION, COORDINATE_REVISION_REQUIRED
+
+#### Verification
+
+Build completed successfully:
+- ✅ Next.js 16.0.7 (security patched)
+- ✅ All 41 routes generated
+- ✅ Zero TypeScript errors
+- ✅ Valid statuses confirmed against Prisma schema
+- ✅ Document uploads now work in ACCEPTANCE_IN_PROGRESS status
+- ✅ Auto-save works for editable application states
+
+#### User Impact
+
+**Before Fix:**
+- ❌ Document uploads failed with "Cannot upload documents for this application status"
+- ❌ Auto-save continuously failed with 400 errors in Vercel logs
+- ❌ Users blocked from uploading acceptance requirements
+- ❌ Production logs filled with error messages
+
+**After Fix:**
+- ✅ Users can upload documents during acceptance requirements review
+- ✅ Auto-save works correctly for editable applications
+- ✅ No more 400 errors in production logs
+- ✅ Clean Vercel logs
+- ✅ Improved user experience
+
+#### Schema Validation
+
+All statuses verified against Prisma schema:
+```prisma
+enum ApplicationStatus {
+  DRAFT                                 ✓
+  RETURNED                              ✓
+  FOR_ACTION                            ✓
+  OVERLAP_DETECTED_PENDING_CONSENT      ✓
+  COORDINATE_REVISION_REQUIRED          ✓
+  ACCEPTANCE_IN_PROGRESS                ✓
+  PENDING_OTHER_DOCUMENTS               ✓
+  // ... other statuses
+}
+```
+
+---
 
 ### Version 2.5 (December 7, 2025)
 

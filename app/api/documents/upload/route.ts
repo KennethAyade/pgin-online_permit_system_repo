@@ -49,12 +49,13 @@ export async function POST(request: NextRequest) {
 
     // Allow document uploads for draft, returned, for-action, and overlap-related statuses
     const allowedStatuses = [
-      "DRAFT",
-      "RETURNED",
-      "FOR_ACTION",
-      "OVERLAP_DETECTED_PENDING_CONSENT",
-      "PENDING_COORDINATES",
-      "COORDINATE_REVISION_REQUIRED"
+      "DRAFT",                                  // Initial creation
+      "RETURNED",                               // Returned for revisions
+      "FOR_ACTION",                             // Awaiting applicant action
+      "OVERLAP_DETECTED_PENDING_CONSENT",       // Uploading consent letters
+      "COORDINATE_REVISION_REQUIRED",           // Resubmitting coordinates
+      "ACCEPTANCE_IN_PROGRESS",                 // During acceptance requirements review
+      "PENDING_OTHER_DOCUMENTS",                // Uploading other documents
     ] as const
     if (!allowedStatuses.includes(application.status as any)) {
       return NextResponse.json(
