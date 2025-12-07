@@ -34,12 +34,15 @@ export function CoordinatePointManager({
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   // Track which field is currently focused and its text value
+  // Use both ref (synchronous) and state (for rendering) to prevent race conditions
+  const focusedFieldRef = useRef<string | null>(null)
   const [focusedField, setFocusedField] = useState<string | null>(null)
   const [textValues, setTextValues] = useState<Record<string, string>>({})
 
   // Clear text values when number of coordinates changes (points added/removed)
   useEffect(() => {
     setTextValues({})
+    focusedFieldRef.current = null
     setFocusedField(null)
   }, [coordinates.length])
 
@@ -49,7 +52,8 @@ export function CoordinatePointManager({
     const input = inputRefs.current[inputKey]
     if (!input) return
 
-    // Make sure field is marked as focused
+    // Make sure field is marked as focused (both ref and state)
+    focusedFieldRef.current = inputKey
     setFocusedField(inputKey)
 
     const start = input.selectionStart || 0
@@ -110,6 +114,7 @@ export function CoordinatePointManager({
     value: string
   ) => {
     const inputKey = `${index}-${field}`
+    focusedFieldRef.current = null
     setFocusedField(null)
 
     const newCoordinates = [...coordinates]
@@ -205,7 +210,7 @@ export function CoordinatePointManager({
                         id={`lat-${index}`}
                         type="text"
                         value={
-                          focusedField === `${index}-lat`
+                          (focusedField === `${index}-lat` || focusedFieldRef.current === `${index}-lat`)
                             ? textValues[`${index}-lat`] ?? ''
                             : point.lat && point.lat !== 0
                             ? decimalToDMS(point.lat, true)
@@ -216,6 +221,7 @@ export function CoordinatePointManager({
                         }
                         onFocus={() => {
                           const inputKey = `${index}-lat`
+                          focusedFieldRef.current = inputKey
                           setFocusedField(inputKey)
                           // Initialize text value with current DMS value when focusing
                           if (!textValues[inputKey]) {
@@ -295,7 +301,7 @@ export function CoordinatePointManager({
                         id={`lng-${index}`}
                         type="text"
                         value={
-                          focusedField === `${index}-lng`
+                          (focusedField === `${index}-lng` || focusedFieldRef.current === `${index}-lng`)
                             ? textValues[`${index}-lng`] ?? ''
                             : point.lng && point.lng !== 0
                             ? decimalToDMS(point.lng, false)
@@ -306,6 +312,7 @@ export function CoordinatePointManager({
                         }
                         onFocus={() => {
                           const inputKey = `${index}-lng`
+                          focusedFieldRef.current = inputKey
                           setFocusedField(inputKey)
                           // Initialize text value with current DMS value when focusing
                           if (!textValues[inputKey]) {

@@ -124,14 +124,29 @@ export function decimalToDMS(decimal: number, isLatitude: boolean = false): stri
   const absoluteDecimal = Math.abs(decimal)
 
   // Extract degrees
-  const degrees = Math.floor(absoluteDecimal)
+  let degrees = Math.floor(absoluteDecimal)
 
   // Extract minutes
-  const minutesDecimal = (absoluteDecimal - degrees) * 60
-  const minutes = Math.floor(minutesDecimal)
+  let minutesDecimal = (absoluteDecimal - degrees) * 60
+  let minutes = Math.floor(minutesDecimal)
 
   // Extract seconds
-  const seconds = (minutesDecimal - minutes) * 60
+  let seconds = (minutesDecimal - minutes) * 60
+
+  // Round seconds to 2 decimal places to avoid floating point precision issues
+  seconds = Math.round(seconds * 100) / 100
+
+  // Handle rollover: if seconds >= 60, add to minutes
+  if (seconds >= 60) {
+    seconds = 0
+    minutes += 1
+  }
+
+  // Handle rollover: if minutes >= 60, add to degrees
+  if (minutes >= 60) {
+    minutes = 0
+    degrees += 1
+  }
 
   // Format with 2 decimal places for seconds
   const secondsFormatted = seconds.toFixed(2)

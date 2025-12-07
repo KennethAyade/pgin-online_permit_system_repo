@@ -391,6 +391,7 @@ model AcceptanceRequirement {
   @@index([applicationId])
   @@index([status])
   @@index([order])
+  @@unique([applicationId, requirementType], name: "unique_application_requirement")
   @@map("acceptance_requirements")
 }
 

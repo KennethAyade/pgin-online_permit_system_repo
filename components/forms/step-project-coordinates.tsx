@@ -25,6 +25,7 @@ const CoordinateMap = dynamic(
 )
 
 interface StepProjectCoordinatesProps {
+  applicationId?: string
   data: any
   onUpdate: (data: any) => void
   applicationStatus?: string
@@ -35,6 +36,7 @@ interface StepProjectCoordinatesProps {
 }
 
 export function StepProjectCoordinates({
+  applicationId,
   data,
   onUpdate,
   applicationStatus,
@@ -46,6 +48,10 @@ export function StepProjectCoordinates({
   const [consentFile, setConsentFile] = useState<File | null>(null)
   const [isUploadingConsent, setIsUploadingConsent] = useState(false)
   const [consentUploadError, setConsentUploadError] = useState<string>("")
+
+  // Track last validated coordinates to prevent unnecessary parent updates
+  const [lastValidatedCoords, setLastValidatedCoords] = useState<CoordinatePoint[]>([])
+
   // Initialize coordinates from data (support both old and new formats)
   const [coordinates, setCoordinates] = useState<CoordinatePoint[]>(() => {
     const normalized = normalizeCoordinates(data.projectCoordinates)
@@ -69,6 +75,11 @@ export function StepProjectCoordinates({
   useEffect(() => {
     if (isReadOnly) return
 
+    // Check if coordinates actually changed (deep comparison)
+    // This prevents unnecessary re-renders while user is typing
+    const coordsChanged = JSON.stringify(coordinates) !== JSON.stringify(lastValidatedCoords)
+    if (!coordsChanged) return
+
     // Validate coordinates
     const validation = validatePolygonGeometry(coordinates)
     if (!validation.isValid) {
@@ -81,7 +92,11 @@ export function StepProjectCoordinates({
     onUpdate({
       projectCoordinates: coordinates
     })
-  }, [coordinates, isReadOnly, onUpdate])
+
+    // Remember last validated coordinates
+    setLastValidatedCoords(coordinates)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coordinates, isReadOnly])
 
   const handleCoordinatesChange = (newCoordinates: CoordinatePoint[]) => {
     setCoordinates(newCoordinates)
@@ -115,7 +130,7 @@ export function StepProjectCoordinates({
       // Upload file
       const formData = new FormData()
       formData.append("file", consentFile)
-      formData.append("applicationId", data.id)
+      formData.append("applicationId", applicationId || data.id || "")
       formData.append("documentType", "CONSENT_LETTER")
       formData.append("documentName", "Consent Letter for Overlapping Coordinates")
 

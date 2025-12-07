@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       "FOR_ACTION",                             // Awaiting applicant action
       "OVERLAP_DETECTED_PENDING_CONSENT",       // Uploading consent letters
       "COORDINATE_REVISION_REQUIRED",           // Resubmitting coordinates
+      "COORDINATE_AUTO_APPROVED",               // NEW applications after coordinate approval
       "ACCEPTANCE_IN_PROGRESS",                 // During acceptance requirements review
       "PENDING_OTHER_DOCUMENTS",                // Uploading other documents
     ] as const

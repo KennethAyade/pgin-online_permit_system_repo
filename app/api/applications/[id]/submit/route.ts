@@ -44,7 +44,7 @@ export async function POST(
     }
 
     // Allow submission of new or revised applications
-    const allowedStatuses = ["DRAFT", "RETURNED", "FOR_ACTION"] as const
+    const allowedStatuses = ["DRAFT", "COORDINATE_AUTO_APPROVED", "RETURNED", "FOR_ACTION"] as const
     if (!allowedStatuses.includes(application.status as any)) {
       return NextResponse.json(
         { error: "Application cannot be submitted in its current status" },

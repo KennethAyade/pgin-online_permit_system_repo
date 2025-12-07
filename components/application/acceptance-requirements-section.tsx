@@ -130,8 +130,17 @@ export function AcceptanceRequirementsSection({
               }
             }
           } else {
-            // If initialization fails (e.g., already initialized), just use the empty result
-            setRequirements([])
+            // If initialization fails, check if it's due to blocked status
+            const errorData = await initResponse.json().catch(() => ({}))
+
+            if (errorData.requiresAction) {
+              // Show user-friendly message for blocked initialization
+              setError(errorData.requiresAction)
+              setRequirements([])
+            } else {
+              // Other errors - just use empty result
+              setRequirements([])
+            }
           }
         } catch (initErr) {
           console.error("Failed to initialize requirements:", initErr)

@@ -57,14 +57,18 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
 
   // Auto-save draft when form data changes (only for steps after application creation)
   useEffect(() => {
-    if (applicationIdState && currentStep >= APPLICATION_STEPS.PROJECT_COORDINATES) {
+    // Only auto-save for editable statuses
+    const editableStatuses = ["DRAFT", "RETURNED", "FOR_ACTION", "COORDINATE_REVISION_REQUIRED"]
+    const canAutoSave = !applicationStatus || editableStatuses.includes(applicationStatus)
+
+    if (applicationIdState && currentStep >= APPLICATION_STEPS.PROJECT_COORDINATES && canAutoSave) {
       const timeoutId = setTimeout(() => {
         saveDraft()
       }, 2000) // Debounce: save 2 seconds after last change
 
       return () => clearTimeout(timeoutId)
     }
-  }, [formData, currentStep, applicationIdState])
+  }, [formData, currentStep, applicationIdState, applicationStatus])
 
   const saveDraft = async () => {
     if (!applicationIdState) return
@@ -143,6 +147,7 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       setFormData({
         ...formData,
         coordinateAutoApproved: result.autoApproved,
+        coordinateApprovedAt: result.application?.coordinateApprovedAt,
         overlappingProjectIds: result.overlappingProjects?.map((p: any) => p.id),
       })
 
@@ -288,6 +293,7 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       case APPLICATION_STEPS.PROJECT_COORDINATES:
         return (
           <StepProjectCoordinates
+            applicationId={applicationIdState}
             data={formData}
             onUpdate={updateFormData}
             applicationStatus={applicationStatus}

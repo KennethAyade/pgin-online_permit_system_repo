@@ -52,6 +52,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if application is in a state that can initialize acceptance requirements
+    const blockedStatuses = [
+      "OVERLAP_DETECTED_PENDING_CONSENT",  // Waiting for consent letter
+      "COORDINATE_REVISION_REQUIRED",      // Coordinates need revision
+      "DRAFT",                              // Still in draft mode
+    ]
+
+    if (blockedStatuses.includes(application.status)) {
+      return NextResponse.json(
+        {
+          error: `Cannot initialize acceptance requirements. Application status: ${application.status}`,
+          requiresAction: application.status === "OVERLAP_DETECTED_PENDING_CONSENT"
+            ? "Please upload consent letter for overlapping coordinates before proceeding"
+            : application.status === "COORDINATE_REVISION_REQUIRED"
+            ? "Please revise your coordinates based on admin feedback"
+            : "Please complete all wizard steps first"
+        },
+        { status: 400 }
+      )
+    }
+
     // Check if requirements already initialized
     const existingRequirements = await prisma.acceptanceRequirement.findFirst({
       where: { applicationId }
