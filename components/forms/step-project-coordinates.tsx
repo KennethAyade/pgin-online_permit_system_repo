@@ -115,7 +115,9 @@ export function StepProjectCoordinates({
       // Upload file
       const formData = new FormData()
       formData.append("file", consentFile)
-      formData.append("type", "consent_letter")
+      formData.append("applicationId", data.id)
+      formData.append("documentType", "CONSENT_LETTER")
+      formData.append("documentName", "Consent Letter for Overlapping Coordinates")
 
       const response = await fetch("/api/documents/upload", {
         method: "POST",
@@ -123,22 +125,23 @@ export function StepProjectCoordinates({
       })
 
       if (!response.ok) {
-        throw new Error("Failed to upload consent letter")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to upload consent letter")
       }
 
       const result = await response.json()
-      
+
       // Update application with consent letter URL
       onUpdate({
         ...data,
-        consentLetterUrl: result.fileUrl,
-        consentLetterFilename: result.fileName,
+        consentLetterUrl: result.document.fileUrl,
+        consentLetterFilename: result.document.fileName,
       })
 
       alert("Consent letter uploaded successfully")
     } catch (error) {
       console.error("Error uploading consent letter:", error)
-      setConsentUploadError("Failed to upload consent letter. Please try again.")
+      setConsentUploadError(error instanceof Error ? error.message : "Failed to upload consent letter. Please try again.")
     } finally {
       setIsUploadingConsent(false)
     }
