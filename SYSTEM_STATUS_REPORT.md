@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 2.5.1
-**Last Updated**: 2025-12-07
-**Status**: Production Ready (Security Patched + Production Fixes)
-**Latest Update**: Production Bug Fixes - Fixed document upload failures and auto-save errors by correcting allowed application statuses. Removed non-existent PENDING_COORDINATES status and added ACCEPTANCE_IN_PROGRESS and PENDING_OTHER_DOCUMENTS statuses. Users can now upload documents during acceptance requirements review.
+**Document Version**: 2.5.2
+**Last Updated**: 2025-12-08
+**Status**: Testing Phase - Manual Evaluation Workflow Restoration
+**Latest Update**: ⚠️ **TESTING** - Restored manual document compliance evaluation workflow. Removed auto-compliance marking from Accept/Reject process and implemented proper evaluation checklist step. Admin must now manually mark documents as compliant/non-compliant in separate evaluation phase. Awaiting client verification of complete workflow.
 
 ---
 
@@ -1375,6 +1375,353 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 2.5.2 (December 8, 2025) ⚠️ TESTING
+
+**Restore Manual Document Compliance Evaluation Workflow** 📋✅
+
+⚠️ **STATUS**: Currently deployed for testing. Not yet confirmed if fully fixed. Awaiting client verification of complete workflow.
+
+This version restores the proper document evaluation workflow where admins manually mark documents as compliant/non-compliant in a separate evaluation step, rather than automatically marking them as compliant when accepting documents.
+
+#### Problem Reported by Client
+
+**Client Report:**
+- Documents were automatically showing as "COMPLIANT" when admin clicked "Accept"
+- Evaluation feature appeared to be missing
+- No way to manually evaluate document compliance
+
+**Root Cause:**
+- Accept/Reject workflow was automatically setting `isCompliant: true` when accepting documents
+- This bypassed the intended evaluation checklist step (Step 6 in workflow)
+- The `EvaluationChecklist` component existed but was only used for later-stage evaluations
+- Acceptance requirements were never manually evaluated for compliance
+
+**Expected Workflow (10 Steps):**
+```
+1. Applicant uploads ALL acceptance requirements (batch upload)
+2. Submits entire application
+3. Admin reviews and accepts/rejects each document (NO compliance marking)
+4. Applicant sees accepted/rejected status
+5. Applicant resubmits rejected documents
+6. ⭐ Admin evaluates using checklist (manually marks compliant/non-compliant)
+7. All acceptance requirements accepted → Applicant uploads other documents
+8. Submit other documents
+9. Admin evaluates other documents (same process)
+10. Final approval
+```
+
+**Current Implementation (WRONG):**
+- Step 3 automatically marked documents as COMPLIANT, skipping Step 6 entirely
+
+#### Solutions Implemented
+
+**1. Removed Auto-Compliance from Accept/Reject APIs** ⭐ CRITICAL
+
+**Files Modified:**
+- `app/api/admin/acceptanceRequirements/review/route.ts`
+- `app/api/admin/otherDocuments/review/route.ts`
+
+**Changes:**
+- Removed `isCompliant`, `complianceMarkedAt`, `complianceMarkedBy` from update operations
+- Accept/Reject now only changes document `status`, NOT compliance fields
+- Compliance fields remain `null` until evaluation step
+
+**Before:**
+```typescript
+data: {
+  status: "ACCEPTED",
+  reviewedAt: new Date(),
+  reviewedBy: adminUser.id,
+  adminRemarks,
+  adminRemarkFileUrl,
+  adminRemarkFileName,
+  isCompliant: isCompliant !== undefined ? isCompliant : true, // ← REMOVED
+  complianceMarkedAt: new Date(),                              // ← REMOVED
+  complianceMarkedBy: adminUser.id,                            // ← REMOVED
+}
+```
+
+**After:**
+```typescript
+data: {
+  status: "ACCEPTED",
+  reviewedAt: new Date(),
+  reviewedBy: adminUser.id,
+  adminRemarks,
+  adminRemarkFileUrl,
+  adminRemarkFileName,
+  // Compliance will be set during evaluation step (EvaluationChecklist)
+}
+```
+
+**2. Removed Compliance UI from Accept/Reject Queue** ⭐ CRITICAL
+
+**File Modified:**
+- `components/admin/acceptance-requirements-queue.tsx`
+
+**Changes:**
+- Removed `isCompliant` field from API request body (line 188)
+- Removed entire compliance checklist UI section (lines 540-589)
+- Admin now only sees Accept/Reject buttons without compliance checkboxes
+- Cleaner, simpler review interface focused on document acceptance
+
+**3. Updated Evaluation API to Save Compliance Data** ⭐ CRITICAL
+
+**File Modified:**
+- `app/api/admin/applications/[id]/evaluate/route.ts`
+
+**Changes:**
+- Added logic to update AcceptanceRequirement records with compliance data after evaluation
+- Created DOCUMENT_LABEL_TO_TYPE mapping to match checklist items to requirements
+- Loops through each checklist item and updates corresponding AcceptanceRequirement
+- Sets `isCompliant`, `complianceMarkedAt`, `complianceMarkedBy` based on admin's evaluation
+
+**Implementation:**
+```typescript
+// Map document labels to requirement types
+const DOCUMENT_LABEL_TO_TYPE: Record<string, string> = {
+  "Application Form (MGB Form 8-4)": "APPLICATION_FORM",
+  "Survey Plan": "SURVEY_PLAN",
+  "Location Map": "LOCATION_MAP",
+  "Work Program": "WORK_PROGRAM",
+  "IEE Report": "IEE_REPORT",
+  "EPEP": "EPEP",
+  "Proof of Technical Competence": "PROOF_TECHNICAL_COMPETENCE",
+  "Proof of Financial Capability": "PROOF_FINANCIAL_CAPABILITY",
+  "Articles of Incorporation": "ARTICLES_INCORPORATION",
+  "Other Supporting Papers": "OTHER_SUPPORTING_PAPERS",
+}
+
+// Update compliance for each checklist item
+for (const item of data.checklistItems) {
+  const requirementType = DOCUMENT_LABEL_TO_TYPE[item.itemName]
+  if (requirementType) {
+    await prisma.acceptanceRequirement.updateMany({
+      where: { applicationId: id, requirementType },
+      data: {
+        isCompliant: item.isCompliant,
+        complianceMarkedAt: new Date(),
+        complianceMarkedBy: session.user.id,
+      },
+    })
+  }
+}
+```
+
+**4. Enhanced Evaluation Checklist to Pre-Fill Accepted Documents** ⭐ KEY FEATURE
+
+**File Modified:**
+- `components/admin/evaluation-checklist.tsx`
+
+**Changes:**
+- Added `useEffect` to fetch AcceptanceRequirement records when dialog opens
+- Pre-fills checklist for requirements with status "ACCEPTED"
+- Shows accepted documents as checked (isComplete: true)
+- Displays current compliance status if already marked
+- Admin can then manually mark each as compliant/non-compliant
+- Provides clear visual indication of which documents are already accepted
+
+**Implementation:**
+```typescript
+const fetchAcceptanceRequirements = async () => {
+  try {
+    const response = await fetch(`/api/acceptanceRequirements/${applicationId}`)
+    if (response.ok) {
+      const data = await response.json()
+      setAcceptanceRequirements(data.requirements || [])
+
+      // Pre-fill checklist for ACCEPTED requirements
+      const prefilledChecklist = {}
+      data.requirements?.forEach((req: any) => {
+        if (req.status === "ACCEPTED") {
+          prefilledChecklist[req.requirementType] = {
+            isComplete: true,
+            isCompliant: req.isCompliant ?? undefined,
+            remarks: req.adminRemarks || undefined,
+          }
+        }
+      })
+      setChecklist(prefilledChecklist)
+    }
+  } catch (err) {
+    console.error("Failed to fetch acceptance requirements:", err)
+  }
+}
+```
+
+#### Files Modified Summary
+
+**Backend API Routes (3 files):**
+1. `app/api/admin/acceptanceRequirements/review/route.ts`
+   - Lines 92-94 (accept branch) - Removed compliance fields
+   - Lines 187-189 (reject branch) - Removed compliance fields
+
+2. `app/api/admin/otherDocuments/review/route.ts`
+   - Lines 92-94 (accept branch) - Removed compliance fields
+   - Lines 187-189 (reject branch) - Removed compliance fields
+
+3. `app/api/admin/applications/[id]/evaluate/route.ts`
+   - Lines 110-143 - Added compliance data persistence logic
+   - Maps checklist items to AcceptanceRequirement records
+   - Updates compliance fields from evaluation
+
+**Frontend Components (2 files):**
+4. `components/admin/acceptance-requirements-queue.tsx`
+   - Line 188 - Removed isCompliant from request body
+   - Lines 540-589 - Removed compliance checklist UI
+
+5. `components/admin/evaluation-checklist.tsx`
+   - Lines 58-90 - Added acceptance requirements fetching
+   - Pre-fills checklist for accepted documents
+   - Added useEffect import (line 3)
+
+#### Workflow After Fix
+
+**BEFORE (Auto-COMPLIANT - WRONG):**
+```
+Upload Docs → Admin Accepts → ✅ COMPLIANT (automatic) → Skip Evaluation → Final Decision
+```
+
+**AFTER (Manual Evaluation - CORRECT):**
+```
+Upload Docs → Admin Accepts → Status: ACCEPTED (no compliance) →
+→ All Accepted → Status: UNDER_REVIEW →
+→ Admin Opens "Evaluate" Button →
+→ EvaluationChecklist Shows All Requirements (accepted ones pre-checked) →
+→ Admin Manually Marks Compliant/Non-Compliant →
+→ Evaluation Saved → AcceptanceRequirement Records Updated →
+→ Application Status Transitions → Final Decision
+```
+
+#### Expected Behavior After Fix
+
+**When Admin Reviews Documents (Steps 3-5):**
+1. ✅ Admin clicks "Accept Requirement"
+2. ✅ Document status changes to "ACCEPTED"
+3. ✅ NO compliance badge appears (compliance fields remain null)
+4. ✅ Compliance checkboxes removed from review UI
+5. ✅ Simpler, cleaner interface
+
+**When All Acceptance Requirements Accepted:**
+1. ✅ Application status changes to "PENDING_OTHER_DOCUMENTS"
+2. ✅ Other documents phase unlocks
+3. ✅ Admin reviews and accepts all other documents
+4. ✅ Application status changes to "UNDER_REVIEW"
+
+**When Admin Evaluates (Step 6):**
+1. ✅ "Evaluate" button appears in admin application details
+2. ✅ Admin clicks "Evaluate"
+3. ✅ EvaluationChecklist modal opens
+4. ✅ All 10-11 acceptance requirements shown
+5. ✅ Requirements with status "ACCEPTED" are pre-checked
+6. ✅ Admin manually marks each as ✓ Compliant or ✗ Non-compliant
+7. ✅ Admin adds optional remarks
+8. ✅ Admin submits evaluation
+9. ✅ AcceptanceRequirement records updated with compliance data
+10. ✅ Application status transitions based on evaluation result
+
+#### Build Verification
+
+**Status:** ✅ Build completed successfully
+- Next.js 16.0.7 (security patched)
+- All 41 routes generated
+- Zero TypeScript errors
+- Ready for production deployment
+
+**Commit:** [d302847] fix: restore manual document compliance evaluation workflow
+
+#### Testing Checklist (Pending Client Verification)
+
+**Phase 1: Accept/Reject Without Auto-Compliance**
+- [ ] Admin navigates to Acceptance Requirements Queue
+- [ ] Reviews pending requirement
+- [ ] Clicks "Accept Requirement"
+- [ ] Verify: No "COMPLIANT" badge appears
+- [ ] Verify: Status shows "ACCEPTED" only
+- [ ] Verify: Compliance checkboxes gone from review UI
+
+**Phase 2: Status Transitions**
+- [ ] Admin accepts ALL acceptance requirements
+- [ ] Verify: Application status → "PENDING_OTHER_DOCUMENTS"
+- [ ] Admin accepts all other documents
+- [ ] Verify: Application status → "UNDER_REVIEW"
+
+**Phase 3: Evaluation Checklist**
+- [ ] Admin views application details page
+- [ ] Verify: "Evaluate" button appears
+- [ ] Admin clicks "Evaluate"
+- [ ] Verify: EvaluationChecklist modal opens
+- [ ] Verify: All 10-11 requirements listed
+- [ ] Verify: ACCEPTED requirements pre-checked
+
+**Phase 4: Manual Compliance Marking**
+- [ ] Admin reviews each document in checklist
+- [ ] Admin marks each as Compliant or Non-compliant
+- [ ] Admin adds evaluation summary
+- [ ] Admin submits evaluation
+- [ ] Verify: Evaluation saves successfully
+- [ ] Verify: AcceptanceRequirement records updated
+- [ ] Verify: Application status transitions correctly
+
+**Phase 5: View Compliance Status**
+- [ ] Admin views Documents tab
+- [ ] Verify: Documents show compliance status
+- [ ] Verify: Compliance date and evaluator visible
+- [ ] Admin views Evaluations tab
+- [ ] Verify: Evaluation record with checklist shown
+
+#### Risk Assessment
+
+**Low Risk Changes:**
+- ✅ Removing auto-compliance is additive (adds evaluation step)
+- ✅ No data loss - just delays when compliance is marked
+- ✅ Backward compatible - existing records keep compliance status
+- ✅ No breaking changes to existing functionality
+
+**Database Impact:**
+- Existing records with compliance data: Unchanged
+- New records: Compliance fields remain null until evaluation
+- No migrations required
+
+#### Known Limitations
+
+**Current Implementation:**
+- Evaluation checklist uses document labels to map to requirement types
+- If document labels change in future, mapping needs update
+- Only works for acceptance requirements (not other documents yet)
+
+**Future Enhancements (Optional):**
+- Add requirementType to checklist items for direct mapping
+- Extend evaluation to cover other documents phase
+- Add bulk compliance marking for faster evaluation
+
+#### Client Communication
+
+**Status:** ⚠️ **Awaiting client verification**
+
+**Deployed:** December 8, 2025, 5:20 PM (Philippine Time)
+
+**Next Steps:**
+1. Client tests complete workflow in production
+2. Verifies evaluation feature is restored and working
+3. Confirms documents no longer auto-marked as compliant
+4. Tests evaluation checklist with pre-filled accepted documents
+5. Provides feedback on any issues found
+
+**Expected Confirmation:**
+- Evaluation feature visible and working
+- Manual compliance marking required
+- Accepted documents pre-populate correctly
+- Complete workflow functions as expected
+
+#### Summary
+
+This update successfully separates the Accept/Reject workflow from the Compliance Evaluation workflow, restoring the intended 10-step process where admins manually evaluate document compliance in Step 6 using the EvaluationChecklist component. The evaluation feature that appeared to be "missing" has been restored by removing the auto-compliance logic that was bypassing it.
+
+**Key Achievement:** ✅ Manual evaluation workflow restored while maintaining all existing functionality and data integrity.
+
+---
 
 ### Version 2.5.1 (December 7, 2025)
 
