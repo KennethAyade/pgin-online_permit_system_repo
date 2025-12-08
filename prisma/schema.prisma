@@ -87,6 +87,7 @@ enum DocumentType {
   // Additional/Returned Documents
   ADDITIONAL_DOCUMENT
   REVISED_DOCUMENT
+  CONSENT_LETTER              // Consent letter for overlapping coordinates
 }
 
 enum CommentType {

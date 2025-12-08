@@ -1376,6 +1376,144 @@ These features were intentionally excluded from MVP:
 
 ## VERSION HISTORY
 
+### Version 2.5.4 (December 8, 2025)
+
+**Per-Application Admin Document Review UI** 📂✅
+
+This version adds per-application views for Acceptance Requirements and Other Documents on the Admin → Applications → Application Review page.
+
+#### Changes
+
+1. **New Admin Tabs on Application Review Page**
+
+- **File:** `components/admin/admin-application-details.tsx`
+- Added two new tabs below the Application Information card:
+  - **Acceptance Requirements** – shows all acceptance requirements for the current application and allows admin Accept/Reject.
+  - **Other Documents** – shows all other documents for the current application and allows admin Accept/Reject.
+- Tabs are powered by the new components:
+  - `AdminAcceptanceRequirements` (`components/admin/admin-acceptance-requirements.tsx`)
+  - `AdminOtherDocuments` (`components/admin/admin-other-documents.tsx`)
+- The existing **Documents**, **Status History**, and **Evaluations** tabs remain unchanged and continue to provide holistic views and evaluation history.
+
+2. **Per-Application Acceptance Requirements Panel**
+
+- **File:** `components/admin/admin-acceptance-requirements.tsx`
+- Behavior:
+  - Fetches all acceptance requirements for a single application via `GET /api/acceptanceRequirements/[applicationId]`.
+  - Displays requirement name, type, status, and submitted file name (if any).
+  - Provides **View** action (opens the submitted file when a document ID is available).
+  - For requirements with status `PENDING_REVIEW`, shows **Accept** and **Reject** buttons that call `POST /api/admin/acceptanceRequirements/review`.
+  - On successful review, refreshes its own list and triggers the parent `onUpdate` callback so the main application object (status, history, etc.) stays in sync.
+- This panel complements (does not replace) the global Acceptance Requirements Review Queue and is scoped to a single application.
+
+3. **Per-Application Other Documents Panel**
+
+- **Files:**
+  - `app/api/admin/otherDocuments/[id]/route.ts` – new admin API for listing other documents by application.
+  - `components/admin/admin-other-documents.tsx` – new UI component.
+- Behavior:
+  - Admin API:
+    - `GET /api/admin/otherDocuments/[id]` (admin-only) returns all `OtherDocument` rows for the specified application, ordered by `createdAt`.
+    - Uses the same `auth` + `adminUser` checks as other admin routes.
+  - UI component:
+    - Fetches other documents via the new admin endpoint.
+    - Shows document name, type, status, submitted file name, and admin remarks (if any).
+    - Provides **View** action (opens `submittedFileUrl` in a new tab).
+    - For documents with status `PENDING_REVIEW`, shows **Accept** and **Reject** buttons that call `POST /api/admin/otherDocuments/review`.
+    - On success, refreshes its list and calls `onUpdated` on the parent to keep the application view up to date.
+
+#### Impact on Workflow
+
+- Admins can now perform document-level review directly from the per-application **Application Review** page:
+  - **Acceptance Requirements tab:** supports Step 3/5 of the 10-step flow (per-requirement Accept/Reject) scoped to a single application.
+  - **Other Documents tab:** supports the analogous review for Phase 2 "Other Documents" (Step 9).
+- The existing global queues under Admin → Dashboard remain available for batch processing across multiple applications.
+- The overall evaluation step (using `EvaluationChecklist` and `POST /api/admin/applications/[id]/evaluate`) remains reserved for later statuses (`UNDER_REVIEW`, `INITIAL_CHECK`, `TECHNICAL_REVIEW`, etc.), preserving the restored manual compliance workflow from Version 2.5.2.
+
+---
+
+### Version 2.5.3 (December 8, 2025)
+
+**Fix Consent Letter Upload Enum Mismatch** 📎✅
+
+This version fixes the internal server error when uploading consent letters on Step 2 (Project Coordinates) after overlap is detected.
+
+#### Problem
+
+- When coordinates overlapped an existing permit, the system required a consent letter.
+- The frontend correctly sent `documentType: "CONSENT_LETTER"` to `/api/documents/upload`.
+- The `DocumentType` enum in `prisma/schema.prisma` did **not** include `CONSENT_LETTER`.
+- Prisma rejected the value at document creation time, causing a 500 "Internal server error" and preventing the file from attaching.
+
+#### Root Cause
+
+- Incomplete implementation of consent letter support: notification types and statuses existed, and the upload form passed `CONSENT_LETTER`, but the enum did not.
+- The upload flow succeeded up to writing the file (local filesystem or Vercel Blob) and then failed when creating the `Document` record.
+
+#### Changes Implemented
+
+1. **Schema Update: Add CONSENT_LETTER to DocumentType**
+
+- **File:** `prisma/schema.prisma`
+- **Change:** extended `enum DocumentType` to include a dedicated value for consent letters:
+
+```prisma
+enum DocumentType {
+  // Mandatory Requirements
+  APPLICATION_FORM
+  SURVEY_PLAN
+  LOCATION_MAP
+  WORK_PROGRAM
+  IEE_REPORT
+  EPEP
+  PROOF_TECHNICAL_COMPETENCE
+  PROOF_FINANCIAL_CAPABILITY
+  ARTICLES_INCORPORATION
+  OTHER_SUPPORTING_PAPERS
+  
+  // Other Requirements
+  AREA_STATUS_CLEARANCE_CENRO
+  AREA_STATUS_CLEARANCE_MGB
+  CERTIFICATE_POSTING_BARANGAY
+  CERTIFICATE_POSTING_MUNICIPAL
+  CERTIFICATE_POSTING_PROVINCIAL
+  CERTIFICATE_POSTING_CENRO
+  CERTIFICATE_POSTING_PENRO
+  CERTIFICATE_POSTING_MGB
+  ECC
+  SANGGUNIAN_ENDORSEMENT_BARANGAY
+  SANGGUNIAN_ENDORSEMENT_MUNICIPAL
+  SANGGUNIAN_ENDORSEMENT_PROVINCIAL
+  FIELD_VERIFICATION_REPORT
+  SURETY_BOND
+  
+  // Additional/Returned Documents
+  ADDITIONAL_DOCUMENT
+  REVISED_DOCUMENT
+  CONSENT_LETTER              // Consent letter for overlapping coordinates
+}
+```
+
+- Ran:
+  - `npm run db:push` (sync Prisma schema to PostgreSQL)
+
+2. **Behavioral Result**
+
+- `components/forms/step-project-coordinates.tsx` already sends:
+  - `documentType = "CONSENT_LETTER"`
+  - `documentName = "Consent Letter for Overlapping Coordinates"`
+- `/api/documents/upload` now accepts `CONSENT_LETTER` as a valid enum value.
+- Document records are created successfully and the consent letter attaches without triggering a 500 error.
+
+#### Impact
+
+- ✅ Fixes consent letter upload on Step 2 when `ApplicationStatus = OVERLAP_DETECTED_PENDING_CONSENT`.
+- ✅ Keeps existing upload validation and storage logic unchanged.
+- ✅ Enables future reporting/filtering on consent letters via `DocumentType.CONSENT_LETTER`.
+- 🔄 No data migration required (only enum extension); existing documents remain valid.
+
+---
+
 ### Version 2.5.2 (December 8, 2025) ⚠️ TESTING
 
 **Restore Manual Document Compliance Evaluation Workflow** 📋✅

@@ -7,6 +7,8 @@ import { StatusTimeline } from "@/components/application/status-timeline"
 import { DocumentList } from "@/components/application/document-list"
 import { DecisionModal } from "./decision-modal"
 import { EvaluationChecklist } from "./evaluation-checklist"
+import { AdminAcceptanceRequirements } from "./admin-acceptance-requirements"
+import { AdminOtherDocuments } from "./admin-other-documents"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, History, ClipboardCheck, User } from "lucide-react"
@@ -165,6 +167,14 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
             <FileText className="h-4 w-4 mr-2" />
             Documents
           </TabsTrigger>
+          <TabsTrigger value="acceptance-requirements" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+            <FileText className="h-4 w-4 mr-2" />
+            Acceptance Requirements
+          </TabsTrigger>
+          <TabsTrigger value="other-documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+            <FileText className="h-4 w-4 mr-2" />
+            Other Documents
+          </TabsTrigger>
           <TabsTrigger value="status" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
             <History className="h-4 w-4 mr-2" />
             Status History
@@ -182,6 +192,14 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
             applicationStatus={application.status}
             evaluations={application.evaluations || []}
           />
+        </TabsContent>
+
+        <TabsContent value="acceptance-requirements">
+          <AdminAcceptanceRequirements applicationId={application.id} onUpdated={onUpdate} />
+        </TabsContent>
+
+        <TabsContent value="other-documents">
+          <AdminOtherDocuments applicationId={application.id} onUpdated={onUpdate} />
         </TabsContent>
 
         <TabsContent value="status">
