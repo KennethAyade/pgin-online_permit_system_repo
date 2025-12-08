@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { File, Download, CheckCircle2, XCircle, FileText, AlertTriangle } from "lucide-react"
+import { File, Download, CheckCircle2, XCircle, FileText, AlertTriangle, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { DocumentUpload } from "@/components/application/document-upload"
@@ -15,6 +15,8 @@ interface DocumentListProps {
   canEdit?: boolean
   onRefresh?: () => void
   evaluations?: any[]
+  // mode="admin" is used on the admin side to enable special actions
+  mode?: "user" | "admin"
 }
 
 const DOCUMENT_LABELS: Record<string, string> = {
@@ -51,33 +53,92 @@ export function DocumentList({
   canEdit = false,
   onRefresh,
   evaluations,
+  mode = "user",
 }: DocumentListProps) {
   const [previewDocument, setPreviewDocument] = useState<any | null>(null)
   const [editingDocumentId, setEditingDocumentId] = useState<string | null>(null)
+  const [reviewingConsentId, setReviewingConsentId] = useState<string | null>(null)
 
-  // Collect checklist items that are non-compliant with their remarks
+  // Collect checklist items that are explicitly compliant / non-compliant with their remarks
   const nonCompliantItems = new Map<string, { remarks: string | null; checkedBy: string | null }>()
+  const compliantItems = new Map<string, { checkedBy: string | null }>()
+
   if (evaluations && evaluations.length > 0) {
     for (const evaluation of evaluations) {
       if (!evaluation?.checklistItems) continue
       for (const item of evaluation.checklistItems) {
-        if (item?.category === "DOCUMENT_VERIFICATION" && item.isCompliant === false) {
-          nonCompliantItems.set(item.itemName, {
-            remarks: item.remarks || null,
-            checkedBy: evaluation.evaluator?.fullName || null
-          })
+        if (item?.category === "DOCUMENT_VERIFICATION") {
+          if (item.isCompliant === false) {
+            nonCompliantItems.set(item.itemName, {
+              remarks: item.remarks || null,
+              checkedBy: evaluation.evaluator?.fullName || null,
+            })
+          } else if (item.isCompliant === true) {
+            compliantItems.set(item.itemName, {
+              checkedBy: evaluation.evaluator?.fullName || null,
+            })
+          }
         }
       }
     }
   }
 
-  // Helper function to get non-compliant info for a document
+  // Helper functions to get evaluation info for a document
   const getNonCompliantInfo = (label: string, documentType: string) => {
     return nonCompliantItems.get(label) || nonCompliantItems.get(documentType) || null
   }
 
+  const getCompliantInfo = (label: string, documentType: string) => {
+    return compliantItems.get(label) || compliantItems.get(documentType) || null
+  }
+
   const handleDownload = (documentId: string) => {
     window.open(`/api/documents/${documentId}`, "_blank")
+  }
+
+  const handleConsentDecision = async (
+    document: any,
+    decision: "ACCEPT" | "REJECT"
+  ) => {
+    try {
+      setReviewingConsentId(document.id)
+
+      let adminRemarks: string | undefined
+      if (decision === "REJECT") {
+        const input = window.prompt(
+          "Enter remarks for rejecting the consent letter (required):"
+        )
+        if (!input || !input.trim()) {
+          return
+        }
+        adminRemarks = input.trim()
+      }
+
+      const response = await fetch("/api/admin/consentLetters/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          applicationId,
+          decision,
+          adminRemarks,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        alert(data.error || "Failed to review consent letter")
+        return
+      }
+
+      if (onRefresh) {
+        onRefresh()
+      }
+    } catch (error) {
+      console.error("Consent review error:", error)
+      alert("An error occurred while reviewing the consent letter.")
+    } finally {
+      setReviewingConsentId(null)
+    }
   }
 
   if (documents.length === 0) {
@@ -102,7 +163,18 @@ export function DocumentList({
             {documents.map((document) => {
               const label = DOCUMENT_LABELS[document.documentType] || document.documentType
               const nonCompliantInfo = getNonCompliantInfo(label, document.documentType)
+              const compliantInfo = getCompliantInfo(label, document.documentType)
+
               const isNonCompliant = nonCompliantInfo !== null
+              const isExplicitlyCompliant = compliantInfo !== null
+              const isUploaded = !!document.isComplete
+              const hasEvaluation = isNonCompliant || isExplicitlyCompliant
+              const isConsentLetter = document.documentType === "CONSENT_LETTER"
+              const canReviewConsent =
+                mode === "admin" &&
+                isConsentLetter &&
+                isUploaded &&
+                applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT"
 
               return (
                 <div
@@ -110,15 +182,33 @@ export function DocumentList({
                   className={`p-4 rounded-lg border transition-colors ${
                     isNonCompliant
                       ? "bg-red-50 border-red-300"
+                      : isExplicitlyCompliant
+                      ? "bg-green-50 border-green-300"
+                      : isUploaded
+                      ? "bg-yellow-50 border-yellow-300"
                       : "bg-gray-50 border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <div className="flex items-center gap-3 flex-1 justify-between">
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`p-2 rounded-lg ${isNonCompliant ? "bg-red-100" : document.isComplete ? "bg-green-100" : "bg-gray-200"}`}>
+                      <div className={`p-2 rounded-lg ${
+                        isNonCompliant
+                          ? "bg-red-100"
+                          : isExplicitlyCompliant
+                          ? "bg-green-100"
+                          : isUploaded
+                          ? "bg-yellow-100"
+                          : "bg-gray-200"
+                      }`}>
                         <File
                           className={`h-5 w-5 ${
-                            isNonCompliant ? "text-red-700" : document.isComplete ? "text-green-700" : "text-gray-500"
+                            isNonCompliant
+                              ? "text-red-700"
+                              : isExplicitlyCompliant
+                              ? "text-green-700"
+                              : isUploaded
+                              ? "text-yellow-700"
+                              : "text-gray-500"
                           }`}
                         />
                       </div>
@@ -129,9 +219,13 @@ export function DocumentList({
                             <Badge className="bg-red-100 text-red-800 border-red-300 text-[10px] uppercase">
                               Non-compliant
                             </Badge>
-                          ) : document.isComplete ? (
+                          ) : isExplicitlyCompliant ? (
                             <Badge className="bg-green-100 text-green-800 border-green-300 text-[10px] uppercase">
                               Compliant
+                            </Badge>
+                          ) : isUploaded ? (
+                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-[10px] uppercase">
+                              Pending review
                             </Badge>
                           ) : null}
                         </p>
@@ -146,8 +240,10 @@ export function DocumentList({
                     <div className="flex items-center gap-2">
                       {isNonCompliant ? (
                         <XCircle className="h-5 w-5 text-red-600" />
-                      ) : document.isComplete ? (
+                      ) : isExplicitlyCompliant ? (
                         <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : isUploaded ? (
+                        <Loader2 className="h-5 w-5 text-yellow-600" />
                       ) : (
                         <XCircle className="h-5 w-5 text-gray-400" />
                       )}
@@ -169,7 +265,36 @@ export function DocumentList({
                         <Download className="h-4 w-4 mr-1" />
                         Download
                       </Button>
-                      {/* Only show Replace button for non-compliant documents */}
+
+                      {/* Admin-only actions for consent letters in overlap workflow */}
+                      {canReviewConsent && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            disabled={reviewingConsentId === document.id}
+                            onClick={() => handleConsentDecision(document, "ACCEPT")}
+                          >
+                            {reviewingConsentId === document.id && (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            )}
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={reviewingConsentId === document.id}
+                            onClick={() => handleConsentDecision(document, "REJECT")}
+                          >
+                            {reviewingConsentId === document.id && (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            )}
+                            Reject
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Only show Replace button for non-compliant documents (applicant side) */}
                       {canEdit && isNonCompliant && (
                         <Button
                           variant="outline"

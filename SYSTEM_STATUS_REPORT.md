@@ -3929,6 +3929,16 @@ npm test
 
 ---
 
+### Version 1.7 (December 8, 2025)
+
+**Wizard Step 5–7 Flow Corrections (Acceptance → Other Requirements → Final Review)**
+- Updated applicant wizard to better reflect the true 10-step workflow and post-submit phases.
+- Step 6 (Other Requirements) now enforces its locked state via Next-button gating while the application is still in early/pre-acceptance statuses (DRAFT, overlap consent flows, coordinate review statuses).
+- Step 6 copy no longer instructs applicants to "proceed to Review & Submit" while the section is locked; it now clearly states that Other Requirements are handled in a later phase from the Application Details page.
+- Step 7 (Final Review) now displays both Acceptance Requirements (uploaded wizard documents) and, when applicable, a summary of Other Requirements sourced from the `other_documents` model (statuses like PENDING_OTHER_DOCUMENTS, PENDING_OTHER_DOCS_REVIEW, UNDER_REVIEW, etc.).
+- Final submission is now hard-blocked until `coordinateApprovedAt` is set; applicants see a dedicated warning banner on Step 7 if coordinates are still under admin review or pending consent verification, and the Submit button is disabled in that state.
+- Added clearer explanatory text to Step 5 about how uploaded files become Acceptance Requirements after submission and are reviewed via the Application Details page.
+
 ### Version 1.6 (November 24, 2025)
 
 **MAJOR: Coordinate-First Approval Flow** ⭐

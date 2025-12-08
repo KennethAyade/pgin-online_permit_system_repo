@@ -35,12 +35,34 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   const progress = (currentStep / totalSteps) * 100
 
   // Check if coordinates are approved (can proceed beyond Step 2)
-  const coordinatesApproved = 
+  //
+  // Cases:
+  // - COORDINATE_AUTO_APPROVED: no overlap, auto-approved.
+  // - DRAFT + coordinateApprovedAt: legacy path where coordinates were approved while still DRAFT.
+  // - OVERLAP_DETECTED_PENDING_CONSENT + consentLetterUrl: overlap detected, but applicant has uploaded
+  //   the required consent letter, so they can proceed while admin reviews asynchronously.
+  const coordinatesApproved =
     applicationStatus === "COORDINATE_AUTO_APPROVED" ||
-    (applicationStatus === "DRAFT" && formData.coordinateApprovedAt)
+    (applicationStatus === "DRAFT" && formData.coordinateApprovedAt) ||
+    (applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT" && !!formData.consentLetterUrl)
+
+  // Coordinates are fully approved only when the admin has set coordinateApprovedAt
+  const coordinatesFullyApproved = !!formData.coordinateApprovedAt
+
   const coordinatesPending = applicationStatus === "PENDING_COORDINATE_APPROVAL" // Deprecated
   const coordinatesOverlapDetected = applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT"
   const coordinatesRejected = applicationStatus === "COORDINATE_REVISION_REQUIRED"
+
+  // Step 6 lock state: Other Requirements remain a future phase while application is in early statuses
+  const isStep6Locked =
+    currentStep === APPLICATION_STEPS.OTHER_REQUIREMENTS &&
+    [
+      "DRAFT",
+      "OVERLAP_DETECTED_PENDING_CONSENT",
+      "COORDINATE_AUTO_APPROVED",
+      "PENDING_COORDINATE_APPROVAL",
+      "COORDINATE_REVISION_REQUIRED",
+    ].includes(applicationStatus)
 
   // Initialize form data from initialData when it changes
   useEffect(() => {
@@ -58,7 +80,13 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
   // Auto-save draft when form data changes (only for steps after application creation)
   useEffect(() => {
     // Only auto-save for editable statuses
-    const editableStatuses = ["DRAFT", "RETURNED", "FOR_ACTION", "COORDINATE_REVISION_REQUIRED"]
+    const editableStatuses = [
+      "DRAFT",
+      "RETURNED",
+      "FOR_ACTION",
+      "COORDINATE_REVISION_REQUIRED",
+      "OVERLAP_DETECTED_PENDING_CONSENT",
+    ]
     const canAutoSave = !applicationStatus || editableStatuses.includes(applicationStatus)
 
     if (applicationIdState && currentStep >= APPLICATION_STEPS.PROJECT_COORDINATES && canAutoSave) {
@@ -237,9 +265,17 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       errors.push("Project Cost is required")
     }
 
-    // Check coordinates are approved
+    // Check coordinates are approved (status-aware messaging)
     if (!formData.coordinateApprovedAt) {
-      errors.push("Project Coordinates must be approved before submission")
+      let coordinateMessage = "Project Coordinates must be approved before submission"
+
+      if (applicationStatus === "PENDING_COORDINATE_APPROVAL") {
+        coordinateMessage = "Project Coordinates are still under admin review"
+      } else if (applicationStatus === "OVERLAP_DETECTED_PENDING_CONSENT") {
+        coordinateMessage = "Project Coordinates cannot be approved until all required consents are verified by admin"
+      }
+
+      errors.push(coordinateMessage)
     }
 
     return { isValid: errors.length === 0, errors }
@@ -247,6 +283,15 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
 
   const handleSubmit = async () => {
     if (!applicationIdState) return
+
+    // Hard guard: coordinates must be fully approved by admin before submission
+    if (!coordinatesFullyApproved) {
+      alert(
+        "Your project coordinates have not yet been approved by the admin.\n\n" +
+        "Please wait for coordinate approval before submitting your application."
+      )
+      return
+    }
 
     // Validate required fields before submission
     const validation = validateRequiredFields()
@@ -359,6 +404,12 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
     if (currentStep === APPLICATION_STEPS.PROJECT_COORDINATES && !coordinatesApproved) {
       return true
     }
+
+    // Prevent leaving Step 6 (Other Requirements) while application is still in early/pre-acceptance statuses
+    if (isStep6Locked) {
+      return true
+    }
+
     return false
   }
 
@@ -399,6 +450,16 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
                 <strong>Waiting for Coordinate Approval</strong>
                 <br />
                 Your project coordinates are being reviewed. You cannot proceed until they are approved.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {currentStep === APPLICATION_STEPS.REVIEW && !coordinatesFullyApproved && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50">
+              <AlertDescription className="text-amber-900 text-sm">
+                <strong>Coordinate approval pending.</strong>
+                <br />
+                Your project coordinates have not yet been approved by the admin. You will receive a notification once they are approved, and you will not be able to submit your application until then.
               </AlertDescription>
             </Alert>
           )}
@@ -465,10 +526,22 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
               {currentStep === totalSteps && (
                 <Button
                   onClick={handleSubmit}
-                  disabled={!applicationIdState}
-                  className="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white"
+                  disabled={!applicationIdState || !coordinatesFullyApproved}
+                  className="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white disabled:opacity-50"
                 >
                   Submit Application
+                </Button>
+              )}
+
+              {/* Direct navigation option when Step 6 is locked */}
+              {isStep6Locked && applicationIdState && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push(`/applications/${applicationIdState}`)}
+                  className="w-full sm:w-auto border-gray-300"
+                >
+                  Go to Application Details
                 </Button>
               )}
             </div>

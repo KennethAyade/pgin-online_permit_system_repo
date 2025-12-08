@@ -191,6 +191,8 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
             applicationId={application.id}
             applicationStatus={application.status}
             evaluations={application.evaluations || []}
+            mode="admin"
+            onRefresh={onUpdate}
           />
         </TabsContent>
 

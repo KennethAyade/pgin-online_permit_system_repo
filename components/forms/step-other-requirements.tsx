@@ -47,7 +47,7 @@ export function StepOtherRequirements({
           <div className="space-y-3">
             <p className="font-semibold">This section is currently locked</p>
             <p className="text-sm">
-              You must first submit your application and complete the acceptance requirements review process. Once ALL acceptance requirements are approved, you will be able to upload these additional documents through your application details page.
+              After you submit your Acceptance Requirements in the wizard, they will be converted into individual items on your Application Details page. Once ALL acceptance requirements are approved there, this Other Requirements section will unlock and you will upload the additional documents from Application Details.
             </p>
           </div>
         </AlertDescription>
@@ -101,7 +101,7 @@ export function StepOtherRequirements({
       <Alert className="border-blue-200 bg-blue-50">
         <Info className="h-4 w-4 text-blue-700" />
         <AlertDescription className="text-blue-800 text-sm">
-          <strong>Note:</strong> You can proceed to the next step (Review & Submit) to complete your initial application submission. The other documents section will unlock automatically once your acceptance requirements are approved.
+          <strong>Note:</strong> These documents are part of a later phase. After your application and acceptance requirements have been reviewed and approved by the admin, you will be able to upload these Other Requirements from your Application Details page.
         </AlertDescription>
       </Alert>
     </div>

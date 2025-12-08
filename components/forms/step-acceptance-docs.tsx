@@ -231,6 +231,13 @@ export function StepAcceptanceDocs({
               <strong>Note:</strong> PDF files only, max {MAX_FILE_SIZE / 1024 / 1024}MB per file. After submitting, the admin will review each document.
             </AlertDescription>
           </Alert>
+
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-700" />
+            <AlertDescription className="text-blue-800 text-sm">
+              <strong>What happens next?</strong> After you submit your application, these uploaded files will be converted into Acceptance Requirements for admin review. You can track their status and respond to any revision requests from your Application Details page.
+            </AlertDescription>
+          </Alert>
         </>
       )}
     </div>

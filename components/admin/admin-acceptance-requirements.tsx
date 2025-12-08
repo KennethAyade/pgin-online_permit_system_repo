@@ -39,7 +39,8 @@ export function AdminAcceptanceRequirements({
     try {
       setLoading(true)
       setError("")
-      const response = await fetch(`/api/acceptanceRequirements/${applicationId}`)
+      // Use admin mode when fetching acceptance requirements so authorization checks allow adminUser
+      const response = await fetch(`/api/acceptanceRequirements/${applicationId}?type=admin`)
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
         throw new Error(data.error || "Failed to load acceptance requirements")

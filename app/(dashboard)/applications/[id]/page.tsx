@@ -52,11 +52,15 @@ export default function ApplicationDetailPage() {
     )
   }
 
+  const canContinue =
+    application.status === "DRAFT" ||
+    application.status === "OVERLAP_DETECTED_PENDING_CONSENT"
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white rounded-lg p-4 sm:p-5 lg:p-6 shadow-lg">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
             <Button
               variant="ghost"
@@ -74,7 +78,7 @@ export default function ApplicationDetailPage() {
               </p>
             </div>
           </div>
-          {application.status === "DRAFT" && (
+          {canContinue && (
             <Button
               onClick={() => router.push(`/applications/new?id=${application.id}`)}
               className="bg-white text-blue-700 hover:bg-blue-50 w-full sm:w-auto"

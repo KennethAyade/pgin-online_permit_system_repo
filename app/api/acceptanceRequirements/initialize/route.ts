@@ -53,21 +53,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if application is in a state that can initialize acceptance requirements
-    const blockedStatuses = [
-      "OVERLAP_DETECTED_PENDING_CONSENT",  // Waiting for consent letter
-      "COORDINATE_REVISION_REQUIRED",      // Coordinates need revision
-      "DRAFT",                              // Still in draft mode
-    ]
+    // Block in the following cases:
+    // - COORDINATE_REVISION_REQUIRED: coordinates need revision
+    // - DRAFT without approved coordinates: wizard not far enough yet
+    //
+    // NOTE: We allow initialization in OVERLAP_DETECTED_PENDING_CONSENT so that
+    // applicants can proceed with Acceptance Requirements while overlap consent
+    // is being handled in parallel.
+    const isCoordinateRevisionRequired = application.status === "COORDINATE_REVISION_REQUIRED"
+    const isDraftWithoutApprovedCoordinates =
+      application.status === "DRAFT" &&
+      !application.coordinateApprovedAt &&
+      !application.coordinateAutoApproved
 
-    if (blockedStatuses.includes(application.status)) {
+    if (isCoordinateRevisionRequired || isDraftWithoutApprovedCoordinates) {
       return NextResponse.json(
         {
           error: `Cannot initialize acceptance requirements. Application status: ${application.status}`,
-          requiresAction: application.status === "OVERLAP_DETECTED_PENDING_CONSENT"
-            ? "Please upload consent letter for overlapping coordinates before proceeding"
-            : application.status === "COORDINATE_REVISION_REQUIRED"
+          requiresAction: isCoordinateRevisionRequired
             ? "Please revise your coordinates based on admin feedback"
-            : "Please complete all wizard steps first"
+            : "Please complete all wizard steps first (including coordinate approval)"
         },
         { status: 400 }
       )
@@ -288,12 +293,27 @@ export async function POST(request: NextRequest) {
     )
 
     // Update application with acceptance requirements started
+    // For DRAFT / COORDINATE_AUTO_APPROVED we move to ACCEPTANCE_IN_PROGRESS.
+    // For overlap / other statuses, keep current status to avoid clobbering
+    // coordinate/consent workflows.
+    let newStatus = application.status
+    if (
+      application.status === "DRAFT" ||
+      application.status === "COORDINATE_AUTO_APPROVED"
+    ) {
+      newStatus = "ACCEPTANCE_IN_PROGRESS"
+    }
+
+    const updateData: any = {
+      acceptanceRequirementsStartedAt: new Date(),
+    }
+    if (newStatus !== application.status) {
+      updateData.status = newStatus
+    }
+
     await prisma.application.update({
       where: { id: applicationId },
-      data: {
-        acceptanceRequirementsStartedAt: new Date(),
-        status: "ACCEPTANCE_IN_PROGRESS",
-      },
+      data: updateData,
     })
 
     // Create notifications for each PENDING_REVIEW requirement

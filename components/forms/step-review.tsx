@@ -31,6 +31,7 @@ export function StepReview({ applicationId, data, onSubmit }: StepReviewProps) {
   const [application, setApplication] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [missingDocs, setMissingDocs] = useState<string[]>([])
+  const [otherDocuments, setOtherDocuments] = useState<any[]>([])
 
   useEffect(() => {
     if (applicationId) {
@@ -45,6 +46,32 @@ export function StepReview({ applicationId, data, onSubmit }: StepReviewProps) {
       if (result.application) {
         setApplication(result.application)
         checkCompleteness(result.application)
+
+        const status = result.application.status
+        const canShowOtherDocs = [
+          "PENDING_OTHER_DOCUMENTS",
+          "PENDING_OTHER_DOCS_REVIEW",
+          "UNDER_REVIEW",
+          "INITIAL_CHECK",
+          "TECHNICAL_REVIEW",
+          "FOR_FINAL_APPROVAL",
+          "APPROVED",
+          "REJECTED",
+        ].includes(status)
+
+        if (canShowOtherDocs) {
+          try {
+            const otherRes = await fetch(`/api/otherDocuments/${applicationId}`)
+            const otherJson = await otherRes.json().catch(() => ({}))
+            if (otherJson.documents) {
+              setOtherDocuments(otherJson.documents)
+            }
+          } catch (err) {
+            console.error("Error fetching other documents:", err)
+          }
+        } else {
+          setOtherDocuments([])
+        }
       }
     } catch (error) {
       console.error("Error fetching application:", error)
@@ -154,10 +181,10 @@ export function StepReview({ applicationId, data, onSubmit }: StepReviewProps) {
         </CardContent>
       </Card>
 
-      {/* Documents List */}
+      {/* Acceptance Documents List */}
       <Card className="border-gray-200 shadow-sm">
         <CardHeader className="bg-gray-50 border-b border-gray-200">
-          <CardTitle className="text-lg font-semibold text-gray-900">Uploaded Documents</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-900">Acceptance Requirements</CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
           {application.documents && application.documents.length > 0 ? (
@@ -176,7 +203,37 @@ export function StepReview({ applicationId, data, onSubmit }: StepReviewProps) {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-500 text-center py-4">No documents uploaded</p>
+            <p className="text-sm text-gray-500 text-center py-4">No acceptance documents uploaded</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Other Requirements Summary */}
+      <Card className="border-gray-200 shadow-sm">
+        <CardHeader className="bg-gray-50 border-b border-gray-200">
+          <CardTitle className="text-lg font-semibold text-gray-900">Other Requirements</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          {otherDocuments && otherDocuments.length > 0 ? (
+            <div className="space-y-2">
+              {otherDocuments.map((doc: any) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{doc.documentName}</p>
+                    <p className="text-xs text-gray-500">
+                      Status: {doc.status?.toString().replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-xs border-gray-300">
+                    {doc.status?.toString().replace(/_/g, " ")}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">
+              Other Requirements are not yet available for this application, or will be handled in a later phase.
+            </p>
           )}
         </CardContent>
       </Card>

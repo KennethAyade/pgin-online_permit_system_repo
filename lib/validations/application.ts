@@ -14,6 +14,16 @@ const projectCoordinatesSchema = z.object({
   point4: coordinatePointSchema,
 }).optional()
 
+// Schema for batch-uploaded acceptance documents (Step 5)
+const uploadedDocumentsSchema = z
+  .record(
+    z.object({
+      fileUrl: z.string(),
+      fileName: z.string(),
+    })
+  )
+  .optional()
+
 export const createApplicationSchema = z.object({
   permitType: z.enum(["ISAG", "CSAG"]),
   projectName: z.string().optional(),
@@ -23,6 +33,7 @@ export const createApplicationSchema = z.object({
   projectCost: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid number").optional(),
   projectCoordinates: projectCoordinatesSchema,
   currentStep: z.number().int().min(1).max(7).default(1),
+  uploadedDocuments: uploadedDocumentsSchema,
 })
 
 export const updateApplicationSchema = createApplicationSchema.partial()

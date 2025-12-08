@@ -307,8 +307,9 @@ export function AcceptanceRequirementsSection({
             </Badge>
           </CardTitle>
           <CardDescription>
-            Submit your acceptance requirements one by one. Each requirement must be reviewed and
-            accepted by admin before proceeding to the next.
+            These requirements are based on the documents you uploaded in Step 5 (Acceptance Requirements)
+            of the New Permit Application wizard. Each file from that bulk upload has been converted into
+            an individual requirement here, and must be reviewed and accepted by admin.
           </CardDescription>
         </CardHeader>
         <CardContent>

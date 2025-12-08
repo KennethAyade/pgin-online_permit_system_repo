@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import { auth } from "@/lib/auth"
+import { addWorkingDays } from "@/lib/utils"
+import { ADMIN_REVIEW_DEADLINE_DAYS } from "@/lib/constants"
 
 /**
  * Get all acceptance requirements for an application
@@ -26,7 +28,7 @@ export async function GET(
     const applicationType = request.nextUrl.searchParams.get("type") || "user"
 
     // Get application
-    const application = await prisma.application.findUnique({
+    let application = await prisma.application.findUnique({
       where: { id: applicationId },
       include: {
         user: true,
@@ -41,6 +43,61 @@ export async function GET(
         { error: "Application not found" },
         { status: 404 }
       )
+    }
+
+    // --- Sync existing requirements from uploadedDocuments if needed ---
+    const uploadedDocumentsJson = (application.uploadedDocuments as Record<string, {fileUrl: string, fileName: string}>) || {}
+
+    if (application.acceptanceRequirements.length > 0 && Object.keys(uploadedDocumentsJson).length > 0) {
+      const updates = [] as Parameters<typeof prisma.acceptanceRequirement.update>[]
+      const now = new Date()
+
+      for (const req of application.acceptanceRequirements) {
+        if (
+          req.status === "PENDING_SUBMISSION" &&
+          !req.submittedFileUrl &&
+          uploadedDocumentsJson[req.requirementType as keyof typeof uploadedDocumentsJson]
+        ) {
+          const uploadedDoc = uploadedDocumentsJson[req.requirementType as keyof typeof uploadedDocumentsJson]!
+          updates.push([
+            {
+              where: { id: req.id },
+              data: {
+                status: "PENDING_REVIEW" as any,
+                submittedAt: now,
+                submittedBy: application.userId,
+                submittedFileUrl: uploadedDoc.fileUrl,
+                submittedFileName: uploadedDoc.fileName,
+                autoAcceptDeadline: addWorkingDays(now, ADMIN_REVIEW_DEADLINE_DAYS),
+              },
+            },
+          ] as any)
+        }
+      }
+
+      if (updates.length > 0) {
+        await prisma.$transaction(
+          updates.map((args) => prisma.acceptanceRequirement.update(args[0]))
+        )
+
+        // Re-fetch application to include updated requirements
+        application = await prisma.application.findUnique({
+          where: { id: applicationId },
+          include: {
+            user: true,
+            acceptanceRequirements: {
+              orderBy: { order: "asc" },
+            },
+          },
+        }) as typeof application
+
+        if (!application) {
+          return NextResponse.json(
+            { error: "Application not found" },
+            { status: 404 }
+          )
+        }
+      }
     }
 
     // Verify authorization

@@ -52,10 +52,11 @@ export async function PUT(
 
     // Allow draft updates for applications that can be edited
     const editableStatuses = [
-      "DRAFT",                      // Initial creation
-      "RETURNED",                   // Returned for revisions
-      "FOR_ACTION",                 // Awaiting applicant action
-      "COORDINATE_REVISION_REQUIRED" // Coordinates need revision
+      "DRAFT",                              // Initial creation
+      "RETURNED",                           // Returned for revisions
+      "FOR_ACTION",                         // Awaiting applicant action
+      "COORDINATE_REVISION_REQUIRED",       // Coordinates need revision
+      "OVERLAP_DETECTED_PENDING_CONSENT",   // Overlap detected, consent letter required (Step 2)
     ] as const
 
     if (!editableStatuses.includes(existingApplication.status as any)) {
@@ -86,6 +87,9 @@ export async function PUT(
     }
     if (data.projectCoordinates !== undefined) {
       updateData.projectCoordinates = data.projectCoordinates
+    }
+    if (data.uploadedDocuments !== undefined) {
+      updateData.uploadedDocuments = data.uploadedDocuments
     }
 
     // Auto-save: update without changing status
