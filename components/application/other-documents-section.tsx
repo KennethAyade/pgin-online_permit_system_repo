@@ -154,14 +154,13 @@ export function OtherDocumentsSection({
     setSuccess("")
 
     try {
-      // Upload file first
+      // Upload file directly to otherDocuments endpoint
       const formData = new FormData()
       formData.append("file", currentFile)
+      formData.append("documentId", selectedDocument.id)
       formData.append("applicationId", applicationId)
-      formData.append("documentType", selectedDocument.documentType)
-      formData.append("documentName", selectedDocument.documentName)
 
-      const uploadResponse = await fetch("/api/documents/upload", {
+      const uploadResponse = await fetch("/api/otherDocuments/upload", {
         method: "POST",
         body: formData,
       })
@@ -169,27 +168,7 @@ export function OtherDocumentsSection({
       const uploadResult = await uploadResponse.json()
 
       if (!uploadResponse.ok) {
-        setError(uploadResult.error || "File upload failed")
-        return
-      }
-
-      // Submit the other document
-      const submitResponse = await fetch("/api/otherDocuments/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          documentId: selectedDocument.id,
-          submittedFileUrl: uploadResult.document.fileUrl,
-          submittedFileName: uploadResult.document.fileName,
-        }),
-      })
-
-      const submitResult = await submitResponse.json()
-
-      if (!submitResponse.ok) {
-        setError(submitResult.error || "Submission failed")
+        setError(uploadResult.error || "Upload failed")
         return
       }
 
@@ -204,8 +183,8 @@ export function OtherDocumentsSection({
 
       setTimeout(() => setSuccess(""), 3000)
     } catch (error) {
-      console.error("Submission error:", error)
-      setError("An error occurred during submission")
+      console.error("Upload error:", error)
+      setError("An error occurred during upload")
     } finally {
       setSubmitting(false)
     }
@@ -325,7 +304,7 @@ export function OtherDocumentsSection({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.open(selectedDocument.submittedFileUrl, "_blank")}
+                            onClick={() => window.open(`/api/otherDocuments/${selectedDocument.id}/download?inline=1`, "_blank")}
                           >
                             <Download className="h-4 w-4 mr-1" />
                             View

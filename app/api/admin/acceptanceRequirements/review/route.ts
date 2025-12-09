@@ -93,6 +93,76 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      // BUG 6 FIX: Create/update Evaluation checklist to sync with Documents tab
+      // Map requirement types to document labels (for DocumentList matching)
+      const REQUIREMENT_TYPE_TO_LABEL: Record<string, string> = {
+        "APPLICATION_FORM": "Application Form (MGB Form 8-4)",
+        "SURVEY_PLAN": "Survey Plan",
+        "LOCATION_MAP": "Location Map",
+        "WORK_PROGRAM": "Work Program",
+        "IEE_REPORT": "IEE Report",
+        "EPEP": "EPEP",
+        "PROOF_TECHNICAL_COMPETENCE": "Proof of Technical Competence",
+        "PROOF_FINANCIAL_CAPABILITY": "Proof of Financial Capability",
+        "ARTICLES_INCORPORATION": "Articles of Incorporation",
+        "OTHER_SUPPORTING_PAPERS": "Other Supporting Papers",
+      }
+
+      const itemName = REQUIREMENT_TYPE_TO_LABEL[requirement.requirementType] || requirement.requirementName
+
+      // Create or update Evaluation record for acceptance phase
+      await prisma.evaluation.upsert({
+        where: {
+          applicationId_evaluationType: {
+            applicationId: application.id,
+            evaluationType: "INITIAL_CHECK",
+          },
+        },
+        update: {
+          // Evaluation exists - update checklist item for this document
+          checklistItems: {
+            // Delete existing item for this document
+            deleteMany: {
+              itemName: itemName,
+            },
+            // Create new item marking it as compliant
+            create: {
+              itemNumber: 0,
+              itemName: itemName,
+              category: "DOCUMENT_VERIFICATION",
+              isComplete: true,
+              isCompliant: true,
+              remarks: adminRemarks || "Accepted via Acceptance Requirements workflow",
+              checkedAt: new Date(),
+              checkedBy: adminUser.id,
+            },
+          },
+          evaluatedBy: adminUser.id,
+          evaluatedDate: new Date(),
+        },
+        create: {
+          // First evaluation - create new record
+          applicationId: application.id,
+          evaluatorId: adminUser.id,
+          evaluationType: "INITIAL_CHECK",
+          checklistItems: {
+            create: {
+              itemNumber: 0,
+              itemName: itemName,
+              category: "DOCUMENT_VERIFICATION",
+              isComplete: true,
+              isCompliant: true,
+              remarks: adminRemarks || "Accepted via Acceptance Requirements workflow",
+              checkedAt: new Date(),
+              checkedBy: adminUser.id,
+            },
+          },
+          isCompliant: null,
+          evaluatedBy: adminUser.id,
+          evaluatedDate: new Date(),
+        },
+      })
+
       // Check if ALL acceptance requirements are now ACCEPTED
       const allRequirements = await prisma.acceptanceRequirement.findMany({
         where: { applicationId: application.id },

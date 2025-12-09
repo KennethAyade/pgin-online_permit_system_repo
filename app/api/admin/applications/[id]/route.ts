@@ -33,6 +33,9 @@ export async function GET(
         documents: {
           orderBy: { documentType: "asc" },
         },
+        otherDocuments: {
+          orderBy: { createdAt: "asc" },
+        },
         statusHistory: {
           orderBy: { createdAt: "desc" },
         },

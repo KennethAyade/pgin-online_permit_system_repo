@@ -116,6 +116,7 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
       <TabsContent value="documents">
         <DocumentList
           documents={application.documents || []}
+          otherDocuments={application.otherDocuments || []}
           applicationId={application.id}
           applicationStatus={application.status}
           canEdit={canResubmit}

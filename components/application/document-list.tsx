@@ -10,6 +10,7 @@ import { DocumentUpload } from "@/components/application/document-upload"
 
 interface DocumentListProps {
   documents: any[]
+  otherDocuments?: any[]
   applicationId: string
   applicationStatus: string
   canEdit?: boolean
@@ -44,10 +45,16 @@ const DOCUMENT_LABELS: Record<string, string> = {
   SANGGUNIAN_ENDORSEMENT_PROVINCIAL: "Sanggunian Endorsement (Provincial)",
   FIELD_VERIFICATION_REPORT: "Field Verification Report",
   SURETY_BOND: "Surety Bond",
+  // OtherDocument types
+  BUSINESS_PERMIT: "Business Permit",
+  LGU_ENDORSEMENT: "LGU Endorsement",
+  COMMUNITY_CONSENT: "Community Consent",
+  ANCESTRAL_DOMAIN_CLEARANCE: "Ancestral Domain Clearance",
 }
 
 export function DocumentList({
   documents,
+  otherDocuments = [],
   applicationId,
   applicationStatus,
   canEdit = false,
@@ -92,8 +99,27 @@ export function DocumentList({
     return compliantItems.get(label) || compliantItems.get(documentType) || null
   }
 
-  const handleDownload = (documentId: string) => {
-    window.open(`/api/documents/${documentId}`, "_blank")
+  // Merge documents and otherDocuments into a unified list
+  // Add a flag to distinguish between types for download/preview handling
+  const allDocuments = [
+    ...documents.map(doc => ({ ...doc, _isOtherDocument: false })),
+    ...otherDocuments.map(doc => ({
+      ...doc,
+      _isOtherDocument: true,
+      // Map OtherDocument fields to Document fields for consistent rendering
+      fileName: doc.submittedFileName || "N/A",
+      fileUrl: doc.submittedFileUrl,
+      isComplete: !!doc.submittedFileUrl,
+      version: 1, // OtherDocuments don't have versions
+    }))
+  ]
+
+  const handleDownload = (documentId: string, isOtherDocument: boolean) => {
+    if (isOtherDocument) {
+      window.open(`/api/otherDocuments/${documentId}/download`, "_blank")
+    } else {
+      window.open(`/api/documents/${documentId}`, "_blank")
+    }
   }
 
   const handleConsentDecision = async (
@@ -141,7 +167,7 @@ export function DocumentList({
     }
   }
 
-  if (documents.length === 0) {
+  if (allDocuments.length === 0) {
     return (
       <Card className="border-gray-200 shadow-sm">
         <CardContent className="py-12 text-center">
@@ -158,17 +184,41 @@ export function DocumentList({
         <CardHeader className="bg-gray-50 border-b border-gray-200">
           <CardTitle className="text-lg font-semibold text-gray-900">Documents</CardTitle>
         </CardHeader>
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 max-h-[600px] overflow-y-auto">
           <div className="space-y-3">
-            {documents.map((document) => {
+            {allDocuments.map((document) => {
               const label = DOCUMENT_LABELS[document.documentType] || document.documentType
-              const nonCompliantInfo = getNonCompliantInfo(label, document.documentType)
-              const compliantInfo = getCompliantInfo(label, document.documentType)
+              const isOtherDocument = document._isOtherDocument
 
-              const isNonCompliant = nonCompliantInfo !== null
-              const isExplicitlyCompliant = compliantInfo !== null
-              const isUploaded = !!document.isComplete
-              const hasEvaluation = isNonCompliant || isExplicitlyCompliant
+              // For OtherDocuments, use their status field instead of evaluation
+              let isNonCompliant = false
+              let isExplicitlyCompliant = false
+              let isUploaded = !!document.isComplete
+              let hasEvaluation = false
+              let nonCompliantInfo = null
+              let compliantInfo = null
+
+              if (isOtherDocument) {
+                // OtherDocuments have their own status field
+                isUploaded = !!document.submittedFileUrl
+                isExplicitlyCompliant = document.status === "ACCEPTED"
+                isNonCompliant = document.status === "REVISION_REQUIRED"
+                hasEvaluation = isExplicitlyCompliant || isNonCompliant
+
+                if (isNonCompliant && document.adminRemarks) {
+                  nonCompliantInfo = {
+                    remarks: document.adminRemarks,
+                    checkedBy: null // OtherDocuments don't track reviewer name directly
+                  }
+                }
+              } else {
+                // Regular Documents use evaluation checklist
+                nonCompliantInfo = getNonCompliantInfo(label, document.documentType)
+                compliantInfo = getCompliantInfo(label, document.documentType)
+                isNonCompliant = nonCompliantInfo !== null
+                isExplicitlyCompliant = compliantInfo !== null
+                hasEvaluation = isNonCompliant || isExplicitlyCompliant
+              }
               const isConsentLetter = document.documentType === "CONSENT_LETTER"
               const canReviewConsent =
                 mode === "admin" &&
@@ -259,7 +309,7 @@ export function DocumentList({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDownload(document.id)}
+                        onClick={() => handleDownload(document.id, isOtherDocument)}
                         className="border-gray-300 hover:bg-gray-50"
                       >
                         <Download className="h-4 w-4 mr-1" />
@@ -374,7 +424,9 @@ export function DocumentList({
           {previewDocument && (
             <div className="mt-2 border rounded-md overflow-hidden">
               <iframe
-                src={`/api/documents/${previewDocument.id}?inline=1`}
+                src={previewDocument._isOtherDocument
+                  ? `/api/otherDocuments/${previewDocument.id}/download?inline=1`
+                  : `/api/documents/${previewDocument.id}?inline=1`}
                 className="w-full h-[70vh]"
               />
             </div>
@@ -384,7 +436,7 @@ export function DocumentList({
               Close
             </Button>
             {previewDocument && (
-              <Button variant="outline" onClick={() => handleDownload(previewDocument.id)}>
+              <Button variant="outline" onClick={() => handleDownload(previewDocument.id, previewDocument._isOtherDocument)}>
                 <Download className="h-4 w-4 mr-1" />
                 Download PDF
               </Button>

@@ -188,6 +188,7 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
         <TabsContent value="documents">
           <DocumentList
             documents={application.documents || []}
+            otherDocuments={application.otherDocuments || []}
             applicationId={application.id}
             applicationStatus={application.status}
             evaluations={application.evaluations || []}
