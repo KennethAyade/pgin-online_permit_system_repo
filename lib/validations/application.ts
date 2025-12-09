@@ -1,18 +1,32 @@
 import { z } from "zod"
 
-// Schema for a single coordinate point
+// Schema for a single coordinate point (old format)
 const coordinatePointSchema = z.object({
   latitude: z.string(),
   longitude: z.string(),
 })
 
-// Schema for project coordinates (4 points)
-const projectCoordinatesSchema = z.object({
+// Old format (wizard input) - object with point1, point2, point3, point4
+const legacyProjectCoordinatesSchema = z.object({
   point1: coordinatePointSchema,
   point2: coordinatePointSchema,
   point3: coordinatePointSchema,
   point4: coordinatePointSchema,
-}).optional()
+})
+
+// New format (after coordinate submission) - array of {lat, lng}
+const arrayProjectCoordinatesSchema = z.array(
+  z.object({
+    lat: z.number(),
+    lng: z.number(),
+  })
+)
+
+// Accept both formats using union to fix draft save 400 errors after coordinate submission
+const projectCoordinatesSchema = z.union([
+  legacyProjectCoordinatesSchema,
+  arrayProjectCoordinatesSchema,
+]).optional()
 
 // Schema for batch-uploaded acceptance documents (Step 5)
 const uploadedDocumentsSchema = z

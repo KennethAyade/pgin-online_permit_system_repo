@@ -90,8 +90,22 @@ export function StepAcceptanceDocs({
 
       setUploadedDocuments(newUploadedDocs)
 
-      // Notify parent component
+      // Notify parent component (wizard state)
       onUpdate({ uploadedDocuments: newUploadedDocs })
+
+      // Persist uploadedDocuments to the Application record immediately
+      // so that acceptanceRequirements/initialize and subsequent GET
+      // calls can reliably map these files into AcceptanceRequirement
+      // rows without relying solely on the auto-save debounce.
+      try {
+        await fetch(`/api/applications/${applicationId}/draft`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadedDocuments: newUploadedDocs }),
+        })
+      } catch (err) {
+        console.error("Error persisting uploadedDocuments to draft:", err)
+      }
     } catch (error) {
       setErrors(prev => ({ ...prev, [docType]: "An error occurred during upload" }))
     } finally {

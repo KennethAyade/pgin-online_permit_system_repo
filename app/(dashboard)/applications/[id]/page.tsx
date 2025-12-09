@@ -53,8 +53,10 @@ export default function ApplicationDetailPage() {
   }
 
   const canContinue =
-    application.status === "DRAFT" ||
-    application.status === "OVERLAP_DETECTED_PENDING_CONSENT"
+    (application.status === "DRAFT" ||
+      application.status === "OVERLAP_DETECTED_PENDING_CONSENT" ||
+      application.status === "COORDINATE_REVISION_REQUIRED") &&
+    !application.acceptanceRequirementsStartedAt
 
   return (
     <div className="space-y-6">

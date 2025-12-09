@@ -33,8 +33,32 @@ export function ApplicationDetails({ application, onUpdate }: ApplicationDetails
   // Check if user can resubmit documents (when returned for revision)
   const canResubmit = application.status === "RETURNED"
 
+  // Allow continuing the wizard only for truly early-phase drafts where
+  // acceptance requirements have not yet been initialized. Once
+  // acceptanceRequirementsStartedAt is set, the wizard should be
+  // considered "sealed" and users should work from Application Details
+  // instead of re-running Steps 1–5.
+  const canContinue =
+    (application.status === "DRAFT" ||
+      application.status === "OVERLAP_DETECTED_PENDING_CONSENT" ||
+      application.status === "COORDINATE_REVISION_REQUIRED") &&
+    !application.acceptanceRequirementsStartedAt
+
+  const inAcceptancePhase = !!application.acceptanceRequirementsStartedAt
+
   return (
     <Tabs defaultValue="acceptance" className="space-y-4">
+      {inAcceptancePhase && (
+        <Alert className="border-indigo-200 bg-indigo-50">
+          <AlertDescription className="text-indigo-900 text-sm">
+            <strong>Acceptance Requirements phase.</strong>
+            <br />
+            Your application has moved into the Acceptance Requirements phase. Manage your
+            uploaded documents and any revision requests from this page. The original wizard
+            steps (1–5) are now locked.
+          </AlertDescription>
+        </Alert>
+      )}
       <TabsList className="bg-white border border-gray-200 p-1 w-full overflow-x-auto flex-nowrap justify-start">
         <TabsTrigger value="acceptance" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white whitespace-nowrap text-xs sm:text-sm">
           <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />

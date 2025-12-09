@@ -1432,6 +1432,205 @@ This version adds per-application views for Acceptance Requirements and Other Do
 
 ---
 
+### Version 2.5.4 (December 9, 2025) ⚠️ TESTING
+
+**Wizard / Acceptance Requirements Flow Refinements** 🧩 (In Testing)
+
+**Status (Dec 9, 2025, 8:30 AM):**
+- ⚠️ **IN TESTING** – Changes are implemented in code but still undergoing manual verification.
+- ❗ Do **NOT** consider this flow fully fixed yet; client is about to run fresh end-to-end tests.
+
+#### Problems Observed
+
+1. **Applicant status stuck at "Pending Submission" after completing Steps 1–5**
+   - After uploading all Acceptance Requirements in the wizard, the Applications card continued to show "Pending Submission".
+   - Application `status` remained `DRAFT` because Acceptance Requirements were not yet initialized.
+
+2. **Project Information (Step 3) and Project Details (Step 4) not persisted**
+   - Fields like Project Name, Project Area, Footprint Area, Number of Employees, and Project Cost did not appear on applicant or admin Application Details.
+   - Data loss occurred when coordinates were auto-approved (status `COORDINATE_AUTO_APPROVED`) and draft updates started failing.
+
+3. **Admin Documents tab showed uploaded files but application status/progress did not change**
+   - Step 5 uploads correctly created `Document` records.
+   - Application `status` and `uploadedDocuments` JSON remained out of sync, so Acceptance Requirements were not initialized.
+
+4. **Acceptance Requirements tab empty despite existing documents**
+   - Admin "Acceptance Requirements" tab showed "No acceptance requirements found" even though Documents tab listed all files.
+   - `AcceptanceRequirement` rows had never been created for that application, or were created without linking batch uploads.
+
+5. **Wizard allowed applicants to re-run Steps 1–5 after Acceptance phase began**
+   - "Continue Application" button sent users back into the wizard, causing duplicate uploads and inconsistent application state.
+
+#### Root Causes Identified
+
+1. **Draft updates blocked in real-world statuses**
+   - `PUT /api/applications/[id]/draft` only allowed editing in a narrow set of statuses:
+     - `DRAFT`, `RETURNED`, `FOR_ACTION`, `COORDINATE_REVISION_REQUIRED`, `OVERLAP_DETECTED_PENDING_CONSENT`.
+   - After coordinates auto-approved (`COORDINATE_AUTO_APPROVED`), any attempt to save:
+     - Project Info / Details (Steps 3–4),
+     - `uploadedDocuments` JSON (Step 5),
+     resulted in 400 "Cannot update submitted application" errors.
+   - These 400s were logged in the console but not surfaced to the user, so the wizard *looked* successful while data remained unsaved.
+
+2. **Acceptance Requirements initializer only called from Acceptance tab**
+   - `POST /api/acceptanceRequirements/initialize` was only triggered by the `AcceptanceRequirementsSection` when the applicant visited that page.
+   - If the user left the wizard after Step 5 and went straight to Applications without opening that tab,:
+     - No `AcceptanceRequirement` rows existed.
+     - Application stayed `DRAFT` → StatusBadge showed "Pending Submission".
+
+3. **Initializer depends on `uploadedDocuments` JSON**
+   - `acceptanceRequirements/initialize` and GET `/api/acceptanceRequirements/[id]` both read `application.uploadedDocuments` to map bulk uploads into AcceptanceRequirements.
+   - If `uploadedDocuments` never saved (due to failing `/draft`), initializer treats everything as `PENDING_SUBMISSION` and/or cannot initialize at all.
+
+4. **Wizard resume logic ignored acceptance phase**
+   - Applicant Application Details and `/applications/[id]` page both computed `canContinue` based only on status (e.g. `DRAFT`), not on whether acceptance had started.
+   - Even after Acceptance Requirements were initialized, users could re-enter the wizard and re-run Steps 1–5, causing duplicate uploads.
+
+#### Changes Implemented (Testing)
+
+> NOTE: All changes below are in the codebase but **must be validated with fresh E2E tests** before considering production-stable.
+
+1. **Expanded editable statuses for draft updates**
+
+- **Files:**
+  - `app/api/applications/[id]/draft/route.ts`
+  - `components/forms/application-wizard.tsx`
+
+- **Behavioral Change:**
+  - The draft endpoint now allows updates in additional statuses that correspond to real wizard flows:
+
+  ```typescript
+  const editableStatuses = [
+    "DRAFT",
+    "RETURNED",
+    "FOR_ACTION",
+    "COORDINATE_REVISION_REQUIRED",
+    "OVERLAP_DETECTED_PENDING_CONSENT",
+    "COORDINATE_AUTO_APPROVED",      // NEW: after coordinates auto-approve
+    "ACCEPTANCE_IN_PROGRESS",        // NEW: during acceptance phase
+  ] as const
+  ```
+
+  - The wizard auto-save effect mirrors this list so that it only fires for these statuses.
+
+- **Impact (intended):**
+  - After coordinates auto-approve (`COORDINATE_AUTO_APPROVED`), Steps 3–5 can safely persist:
+    - Project Info (name, area, employees, cost).
+    - Project Details.
+    - `uploadedDocuments` JSON for batch acceptance uploads.
+  - Auto-save no longer silently fails with 400s in these common states.
+
+2. **Immediate Acceptance Requirements initialization after Step 5**
+
+- **File:** `components/forms/application-wizard.tsx`
+
+- **Change:**
+  - When leaving Step 5 (Acceptance Documents) and `applicationId` exists, the wizard now calls:
+
+  ```typescript
+  if (currentStep === APPLICATION_STEPS.ACCEPTANCE_DOCS && applicationIdState) {
+    await fetch("/api/acceptanceRequirements/initialize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ applicationId: applicationIdState }),
+    })
+  }
+  ```
+
+- **Impact (intended):**
+  - AcceptanceRequirements are initialized as soon as the applicant finishes Step 5, even if they go straight to Applications and never open the Acceptance Requirements tab.
+  - Application `status` moves from `DRAFT` / `COORDINATE_AUTO_APPROVED` → `ACCEPTANCE_IN_PROGRESS`.
+  - `acceptanceRequirementsStartedAt` is set, making it easier to distinguish pre-/post-acceptance phases.
+
+3. **Durable persistence of `uploadedDocuments` during Step 5**
+
+- **File:** `components/forms/step-acceptance-docs.tsx`
+
+- **Change:**
+  - After a successful document upload in Step 5, the component now:
+    - Updates local state + parent wizard state (`onUpdate({ uploadedDocuments: newUploadedDocs })`).
+    - **Immediately calls** `PUT /api/applications/[id]/draft` with just `uploadedDocuments` to persist the batch JSON to the `Application` record.
+
+  ```typescript
+  await fetch(`/api/applications/${applicationId}/draft`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadedDocuments: newUploadedDocs }),
+  })
+  ```
+
+- **Impact (intended):**
+  - `Application.uploadedDocuments` stays in sync with what the user sees in the wizard, regardless of auto-save timing.
+  - `acceptanceRequirements/initialize` and GET `/api/acceptanceRequirements/[id]` can reliably map batch uploads into AcceptanceRequirement rows (PENDING_REVIEW vs PENDING_SUBMISSION), avoiding the "empty acceptance tab but documents exist" scenario.
+
+4. **Locking wizard after Acceptance Requirements start**
+
+- **Files:**
+  - `components/application/application-details.tsx`
+  - `app/(dashboard)/applications/[id]/page.tsx`
+
+- **Change:**
+  - New `canContinue` logic uses both status **and** `acceptanceRequirementsStartedAt`:
+
+  ```typescript
+  const canContinue =
+    (application.status === "DRAFT" ||
+      application.status === "OVERLAP_DETECTED_PENDING_CONSENT" ||
+      application.status === "COORDINATE_REVISION_REQUIRED") &&
+    !application.acceptanceRequirementsStartedAt
+  ```
+
+- **Impact (intended):**
+  - Before acceptance starts:
+    - Applicants can use "Continue Application" to re-enter the wizard (draft phase, overlap/consent, coordinate revision).
+  - After `acceptanceRequirementsStartedAt` is set:
+    - "Continue Application" disappears.
+    - Wizard Steps 1–5 are effectively sealed; applicants now manage documents exclusively from Application Details (Acceptance Requirements & Other Documents tabs).
+  - Prevents duplicate uploads from re-running Step 5 after acceptance has begun.
+
+5. **Applicant-facing phase banner for Acceptance Requirements**
+
+- **File:** `components/application/application-details.tsx`
+
+- **Change:**
+  - When `acceptanceRequirementsStartedAt` is set, a banner appears above the tabs:
+
+  ```tsx
+  const inAcceptancePhase = !!application.acceptanceRequirementsStartedAt
+
+  {inAcceptancePhase && (
+    <Alert className="border-indigo-200 bg-indigo-50">
+      <AlertDescription className="text-indigo-900 text-sm">
+        <strong>Acceptance Requirements phase.</strong>
+        <br />
+        Your application has moved into the Acceptance Requirements phase. Manage your
+        uploaded documents and any revision requests from this page. The original wizard
+        steps (1–5) are now locked.
+      </AlertDescription>
+    </Alert>
+  )}
+  ```
+
+- **Impact (intended):**
+  - Applicants get explicit guidance that they are now in the Acceptance Requirements phase and should work from Application Details instead of the wizard.
+
+#### Testing Status & Next Steps
+
+- **Status (Dec 9, 2025, 8:30 AM):**
+  - 🔄 Changes deployed to codebase and DB reset performed.
+  - 🧪 Client will run fresh end-to-end tests covering:
+    - New application from Step 1 → Step 6.
+    - Card status transitions (DRAFT → COORDINATE_AUTO_APPROVED → ACCEPTANCE_IN_PROGRESS).
+    - Persistence of Project Info/Details.
+    - Initialization and visibility of Acceptance Requirements for both applicant and admin.
+    - Locking of wizard and absence of duplicate uploads.
+
+- **Important:**
+  - Do **NOT** treat these fixes as production-stable until verification is complete.
+  - Any regressions discovered during testing must be documented and folded back into this section.
+
+---
+
 ### Version 2.5.3 (December 8, 2025)
 
 **Fix Consent Letter Upload Enum Mismatch** 📎✅

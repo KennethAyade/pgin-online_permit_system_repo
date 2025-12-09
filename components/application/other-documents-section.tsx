@@ -67,7 +67,7 @@ export function OtherDocumentsSection({
   const [loading, setLoading] = useState(true)
   const [selectedDocument, setSelectedDocument] = useState<OtherDocument | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null)
+  const [submissionFiles, setSubmissionFiles] = useState<Record<string, File>>({})
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
 
@@ -75,14 +75,55 @@ export function OtherDocumentsSection({
     fetchDocuments()
   }, [applicationId])
 
+  // Clear error/success messages when switching documents
+  useEffect(() => {
+    if (selectedDocument) {
+      setError("")
+      setSuccess("")
+    }
+  }, [selectedDocument?.id])
+
   const fetchDocuments = async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/otherDocuments/${applicationId}`)
       const result = await response.json()
 
-      if (result.documents) {
+      // If no documents exist, try to initialize
+      if (!result.documents || result.documents.length === 0) {
+        console.log("No other documents found, attempting initialization...")
+
+        const initResponse = await fetch("/api/otherDocuments/initialize", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ applicationId }),
+        })
+
+        if (initResponse.ok) {
+          const initResult = await initResponse.json()
+          console.log("Other documents initialized:", initResult)
+
+          // Refetch documents after initialization
+          const refreshResponse = await fetch(`/api/otherDocuments/${applicationId}`)
+          const refreshResult = await refreshResponse.json()
+
+          if (refreshResult.documents) {
+            setDocuments(refreshResult.documents)
+            if (refreshResult.documents.length > 0) {
+              setSelectedDocument(refreshResult.documents[0])
+            }
+          }
+        } else {
+          const errorResult = await initResponse.json()
+          console.log("Initialization not ready:", errorResult.error)
+          // Don't show error to user - this is expected if acceptance reqs not done
+          setDocuments([])
+        }
+      } else {
         setDocuments(result.documents)
+
         // Auto-select first non-accepted document or first document
         const firstPending = result.documents.find(
           (d: any) => d.status === "PENDING_SUBMISSION" || d.status === "REVISION_REQUIRED"
@@ -102,7 +143,8 @@ export function OtherDocumentsSection({
   }
 
   const handleFileUpload = async () => {
-    if (!selectedDocument || !submissionFile) {
+    const currentFile = submissionFiles[selectedDocument?.id || ""]
+    if (!selectedDocument || !currentFile) {
       setError("Please select a file to upload")
       return
     }
@@ -114,7 +156,7 @@ export function OtherDocumentsSection({
     try {
       // Upload file first
       const formData = new FormData()
-      formData.append("file", submissionFile)
+      formData.append("file", currentFile)
       formData.append("applicationId", applicationId)
       formData.append("documentType", selectedDocument.documentType)
       formData.append("documentName", selectedDocument.documentName)
@@ -152,7 +194,12 @@ export function OtherDocumentsSection({
       }
 
       setSuccess("Document submitted successfully!")
-      setSubmissionFile(null)
+      // Clear file for current document after successful submission
+      setSubmissionFiles(prev => {
+        const updated = { ...prev }
+        delete updated[selectedDocument.id]
+        return updated
+      })
       fetchDocuments()
 
       setTimeout(() => setSuccess(""), 3000)
@@ -165,13 +212,25 @@ export function OtherDocumentsSection({
   }
 
   const handleFileChange = (file: File | null) => {
+    if (!selectedDocument) return
+
     if (file) {
       if (file.size > MAX_FILE_SIZE) {
         setError(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB`)
         return
       }
-      setSubmissionFile(file)
+      setSubmissionFiles(prev => ({
+        ...prev,
+        [selectedDocument.id]: file
+      }))
       setError("")
+    } else {
+      // Clear file for this document
+      setSubmissionFiles(prev => {
+        const updated = { ...prev }
+        delete updated[selectedDocument.id]
+        return updated
+      })
     }
   }
 
@@ -314,15 +373,15 @@ export function OtherDocumentsSection({
                           </Label>
 
                           {/* Show selected file */}
-                          {submissionFile && (
+                          {submissionFiles[selectedDocument.id] && (
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-xs text-green-600 flex items-center gap-1">
                                 <FileCheck className="h-3 w-3" />
-                                {submissionFile.name}
+                                {submissionFiles[selectedDocument.id].name}
                               </p>
                               <button
                                 type="button"
-                                onClick={() => setSubmissionFile(null)}
+                                onClick={() => handleFileChange(null)}
                                 className="text-red-600 hover:text-red-800"
                                 title="Remove file"
                                 disabled={submitting}
@@ -365,7 +424,7 @@ export function OtherDocumentsSection({
                             }`}
                           >
                             <Upload className="h-4 w-4" />
-                            {submissionFile ? 'Replace File' : 'Choose File'}
+                            {submissionFiles[selectedDocument.id] ? 'Replace File' : 'Choose File'}
                           </label>
                         </div>
                       </div>
@@ -373,7 +432,7 @@ export function OtherDocumentsSection({
                       {/* Submit Button */}
                       <Button
                         onClick={handleFileUpload}
-                        disabled={!submissionFile || submitting}
+                        disabled={!submissionFiles[selectedDocument.id] || submitting}
                         className="w-full mt-4"
                       >
                         {submitting ? (

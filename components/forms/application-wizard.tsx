@@ -79,13 +79,16 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
 
   // Auto-save draft when form data changes (only for steps after application creation)
   useEffect(() => {
-    // Only auto-save for editable statuses
+    // Only auto-save for editable statuses (must mirror the
+    // editableStatuses list in the draft API route).
     const editableStatuses = [
       "DRAFT",
       "RETURNED",
       "FOR_ACTION",
       "COORDINATE_REVISION_REQUIRED",
       "OVERLAP_DETECTED_PENDING_CONSENT",
+      "COORDINATE_AUTO_APPROVED",
+      "ACCEPTANCE_IN_PROGRESS",
     ]
     const canAutoSave = !applicationStatus || editableStatuses.includes(applicationStatus)
 
@@ -232,6 +235,28 @@ export function ApplicationWizard({ applicationId, initialData }: ApplicationWiz
       }
     } else if (applicationIdState) {
       await saveDraft()
+    }
+
+    // When moving past Step 5 (ACCEPTANCE_DOCS), immediately initialize
+    // Acceptance Requirements so the application status transitions to
+    // ACCEPTANCE_IN_PROGRESS and admin views stay in sync with the
+    // bulk-uploaded documents.
+    if (
+      currentStep === APPLICATION_STEPS.ACCEPTANCE_DOCS &&
+      applicationIdState
+    ) {
+      try {
+        await fetch("/api/acceptanceRequirements/initialize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ applicationId: applicationIdState }),
+        })
+        // We intentionally ignore non-OK responses here (e.g. already
+        // initialized or blocked states) because the Acceptance
+        // Requirements page has its own initialization + error handling.
+      } catch (err) {
+        console.error("Error initializing acceptance requirements:", err)
+      }
     }
 
     if (currentStep < totalSteps) {

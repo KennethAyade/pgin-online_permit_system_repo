@@ -25,6 +25,11 @@ export async function PUT(
     const validationResult = updateApplicationSchema.safeParse(body)
 
     if (!validationResult.success) {
+      console.error("Draft validation failed:", {
+        applicationId: id,
+        status: existingApplication.status,
+        errors: validationResult.error.errors,
+      })
       return NextResponse.json(
         { error: "Validation failed", details: validationResult.error.errors },
         { status: 400 }
@@ -50,13 +55,27 @@ export async function PUT(
       )
     }
 
-    // Allow draft updates for applications that can be edited
+    // Allow draft updates for applications that can be edited.
+    //
+    // This includes:
+    // - DRAFT: initial creation / early steps of the wizard
+    // - RETURNED / FOR_ACTION: application sent back to applicant
+    // - COORDINATE_REVISION_REQUIRED: applicant revising coordinates
+    // - OVERLAP_DETECTED_PENDING_CONSENT: uploading consent letters
+    // - COORDINATE_AUTO_APPROVED: coordinates auto-approved, applicant
+    //   still completing project info and bulk upload
+    // - ACCEPTANCE_IN_PROGRESS: acceptance phase in progress (wizard is
+    //   effectively locked, but auto-save / minor field updates must
+    //   still not 400).
     const editableStatuses = [
-      "DRAFT",                              // Initial creation
-      "RETURNED",                           // Returned for revisions
-      "FOR_ACTION",                         // Awaiting applicant action
-      "COORDINATE_REVISION_REQUIRED",       // Coordinates need revision
-      "OVERLAP_DETECTED_PENDING_CONSENT",   // Overlap detected, consent letter required (Step 2)
+      "DRAFT",
+      "RETURNED",
+      "FOR_ACTION",
+      "COORDINATE_REVISION_REQUIRED",
+      "OVERLAP_DETECTED_PENDING_CONSENT",
+      "COORDINATE_AUTO_APPROVED",
+      "ACCEPTANCE_IN_PROGRESS",
+      "PENDING_OTHER_DOCUMENTS",  // Allow draft updates during Other Documents phase
     ] as const
 
     if (!editableStatuses.includes(existingApplication.status as any)) {
