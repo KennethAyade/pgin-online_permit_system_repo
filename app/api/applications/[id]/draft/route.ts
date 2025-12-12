@@ -27,7 +27,6 @@ export async function PUT(
     if (!validationResult.success) {
       console.error("Draft validation failed:", {
         applicationId: id,
-        status: existingApplication.status,
         errors: validationResult.error.errors,
       })
       return NextResponse.json(
