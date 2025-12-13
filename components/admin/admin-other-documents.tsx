@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, CheckCircle2, AlertCircle, Clock, FileText } from "lucide-react"
 import { EvaluationChecklist } from "./evaluation-checklist"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 interface AdminOtherDocumentsProps {
   applicationId: string
@@ -60,6 +69,10 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
   const [error, setError] = useState("")
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [application, setApplication] = useState<{ permitType: "ISAG" | "CSAG"; status: string } | null>(null)
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; name: string } | null>(null)
+  const [rejectRemarks, setRejectRemarks] = useState("")
+  const [rejectSubmitting, setRejectSubmitting] = useState(false)
 
   useEffect(() => {
     fetchDocuments()
@@ -113,7 +126,7 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
     window.open(fileUrl, "_blank")
   }
 
-  const handleReview = async (documentId: string, decision: "ACCEPT" | "REJECT") => {
+  const handleReview = async (documentId: string, decision: "ACCEPT" | "REJECT", adminRemarks?: string) => {
     try {
       setSubmittingId(documentId)
       setError("")
@@ -123,6 +136,7 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
         body: JSON.stringify({
           documentId,
           decision,
+          adminRemarks: adminRemarks?.trim() || undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -135,6 +149,31 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
       setError(err instanceof Error ? err.message : "Failed to submit review")
     } finally {
       setSubmittingId(null)
+    }
+  }
+
+  const openRejectDialog = (doc: AdminOtherDocumentItem) => {
+    setRejectTarget({ id: doc.id, name: doc.documentName })
+    setRejectRemarks("")
+    setRejectDialogOpen(true)
+  }
+
+  const handleRejectWithRemarks = async () => {
+    if (!rejectTarget) return
+    const trimmedRemarks = rejectRemarks.trim()
+    if (!trimmedRemarks) {
+      setError("Please provide remarks before rejecting this document.")
+      return
+    }
+
+    try {
+      setRejectSubmitting(true)
+      await handleReview(rejectTarget.id, "REJECT", trimmedRemarks)
+      setRejectDialogOpen(false)
+      setRejectTarget(null)
+      setRejectRemarks("")
+    } finally {
+      setRejectSubmitting(false)
     }
   }
 
@@ -230,7 +269,7 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
                       <>
                         <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 text-white"
                           disabled={submittingId === doc.id}
                           onClick={() => handleReview(doc.id, "ACCEPT")}
                         >
@@ -241,9 +280,9 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          className="bg-red-600 hover:bg-red-700 text-white"
                           disabled={submittingId === doc.id}
-                          onClick={() => handleReview(doc.id, "REJECT")}
+                          onClick={() => openRejectDialog(doc)}
                         >
                           {submittingId === doc.id && (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -258,6 +297,72 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
             })}
           </div>
         )}
+
+        <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject other document</DialogTitle>
+              <DialogDescription>
+                {rejectTarget ? (
+                  <span>
+                    You are about to reject <strong>{rejectTarget.name}</strong>. Please provide clear
+                    remarks so the applicant knows how to revise their submission.
+                  </span>
+                ) : (
+                  "Provide remarks for this rejection."
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700" htmlFor="other-doc-reject-remarks">
+                Remarks
+              </label>
+              <Textarea
+                id="other-doc-reject-remarks"
+                value={rejectRemarks}
+                onChange={(e) => setRejectRemarks(e.target.value)}
+                rows={4}
+                placeholder="Explain why this document is being rejected and what the applicant should change."
+              />
+              {!rejectRemarks.trim() && (
+                <p className="text-xs text-red-600">Remarks are required to reject a document.</p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  if (rejectSubmitting) return
+                  setRejectDialogOpen(false)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={rejectSubmitting || !rejectRemarks.trim()}
+                onClick={handleRejectWithRemarks}
+              >
+                {rejectSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  "Confirm Reject"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  )
+}
       </CardContent>
     </Card>
   )

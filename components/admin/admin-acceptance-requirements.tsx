@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, CheckCircle2, XCircle, FileText } from "lucide-react"
 import { EvaluationChecklist } from "./evaluation-checklist"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 interface AdminAcceptanceRequirementsProps {
   applicationId: string
@@ -22,6 +31,11 @@ interface AcceptanceRequirementItem {
   submittedFileUrl?: string | null
 }
 
+interface RejectTargetRequirement {
+  id: string
+  name: string
+}
+
 export function AdminAcceptanceRequirements({
   applicationId,
   onUpdated,
@@ -31,6 +45,10 @@ export function AdminAcceptanceRequirements({
   const [error, setError] = useState("")
   const [submittingId, setSubmittingId] = useState<string | null>(null)
   const [application, setApplication] = useState<{ permitType: "ISAG" | "CSAG"; status: string } | null>(null)
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
+  const [rejectTarget, setRejectTarget] = useState<RejectTargetRequirement | null>(null)
+  const [rejectRemarks, setRejectRemarks] = useState("")
+  const [rejectSubmitting, setRejectSubmitting] = useState(false)
 
   useEffect(() => {
     fetchRequirements()
@@ -88,7 +106,7 @@ export function AdminAcceptanceRequirements({
     }
   }
 
-  const handleReview = async (requirementId: string, decision: "ACCEPT" | "REJECT") => {
+  const handleReview = async (requirementId: string, decision: "ACCEPT" | "REJECT", adminRemarks?: string) => {
     try {
       setSubmittingId(requirementId)
       setError("")
@@ -98,6 +116,7 @@ export function AdminAcceptanceRequirements({
         body: JSON.stringify({
           requirementId,
           decision,
+          adminRemarks: adminRemarks?.trim() || undefined,
         }),
       })
       const data = await response.json().catch(() => ({}))
@@ -110,6 +129,31 @@ export function AdminAcceptanceRequirements({
       setError(err instanceof Error ? err.message : "Failed to submit review")
     } finally {
       setSubmittingId(null)
+    }
+  }
+
+  const openRejectDialog = (requirement: AcceptanceRequirementItem) => {
+    setRejectTarget({ id: requirement.id, name: requirement.requirementName })
+    setRejectRemarks("")
+    setRejectDialogOpen(true)
+  }
+
+  const handleRejectWithRemarks = async () => {
+    if (!rejectTarget) return
+    const trimmedRemarks = rejectRemarks.trim()
+    if (!trimmedRemarks) {
+      setError("Please provide remarks before rejecting this requirement.")
+      return
+    }
+
+    try {
+      setRejectSubmitting(true)
+      await handleReview(rejectTarget.id, "REJECT", trimmedRemarks)
+      setRejectDialogOpen(false)
+      setRejectTarget(null)
+      setRejectRemarks("")
+    } finally {
+      setRejectSubmitting(false)
     }
   }
 
@@ -220,7 +264,7 @@ export function AdminAcceptanceRequirements({
                       <>
                         <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700"
+                          className="bg-green-600 hover:bg-green-700 text-white"
                           disabled={submittingId === req.id}
                           onClick={() => handleReview(req.id, "ACCEPT")}
                         >
@@ -231,9 +275,9 @@ export function AdminAcceptanceRequirements({
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          className="bg-red-600 hover:bg-red-700 text-white"
                           disabled={submittingId === req.id}
-                          onClick={() => handleReview(req.id, "REJECT")}
+                          onClick={() => openRejectDialog(req)}
                         >
                           {submittingId === req.id && (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -248,6 +292,68 @@ export function AdminAcceptanceRequirements({
             })}
           </div>
         )}
+
+        <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Reject requirement</DialogTitle>
+              <DialogDescription>
+                {rejectTarget ? (
+                  <span>
+                    You are about to reject <strong>{rejectTarget.name}</strong>. Please provide clear
+                    remarks so the applicant knows how to revise their submission.
+                  </span>
+                ) : (
+                  "Provide remarks for this rejection."
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700" htmlFor="acceptance-reject-remarks">
+                Remarks
+              </label>
+              <Textarea
+                id="acceptance-reject-remarks"
+                value={rejectRemarks}
+                onChange={(e) => setRejectRemarks(e.target.value)}
+                rows={4}
+                placeholder="Explain why this requirement is being rejected and what the applicant should change."
+              />
+              {!rejectRemarks.trim() && (
+                <p className="text-xs text-red-600">Remarks are required to reject a requirement.</p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  if (rejectSubmitting) return
+                  setRejectDialogOpen(false)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="bg-red-600 hover:bg-red-700 text-white"
+                disabled={rejectSubmitting || !rejectRemarks.trim()}
+                onClick={handleRejectWithRemarks}
+              >
+                {rejectSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  "Confirm Reject"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )
