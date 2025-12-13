@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, CheckCircle2, AlertCircle, Clock, FileText } from "lucide-react"
+import { EvaluationChecklist } from "./evaluation-checklist"
 
 interface AdminOtherDocumentsProps {
   applicationId: string
@@ -58,10 +59,35 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submittingId, setSubmittingId] = useState<string | null>(null)
+  const [application, setApplication] = useState<{ permitType: "ISAG" | "CSAG"; status: string } | null>(null)
 
   useEffect(() => {
     fetchDocuments()
+    fetchApplication()
   }, [applicationId])
+
+  const fetchApplication = async () => {
+    if (!applicationId) return
+    try {
+      const response = await fetch(`/api/admin/applications/${applicationId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setApplication(data.application)
+      }
+    } catch (err) {
+      console.error("Failed to fetch application:", err)
+    }
+  }
+
+  // Determine if evaluation is allowed based on application status
+  const canEvaluate = application && ["SUBMITTED", "UNDER_REVIEW", "INITIAL_CHECK", "TECHNICAL_REVIEW"].includes(application.status)
+
+  // Determine evaluation type based on application status
+  const getEvaluationType = (): "INITIAL_CHECK" | "TECHNICAL_REVIEW" | "FINAL_APPROVAL" => {
+    if (!application) return "INITIAL_CHECK"
+    if (application.status === "TECHNICAL_REVIEW") return "TECHNICAL_REVIEW"
+    return "INITIAL_CHECK"
+  }
 
   const fetchDocuments = async () => {
     if (!applicationId) return
@@ -125,9 +151,23 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
   return (
     <Card className="border-gray-200 shadow-sm">
       <CardHeader className="bg-gray-50 border-b border-gray-200">
-        <CardTitle className="text-lg font-semibold text-gray-900">
-          Other Documents
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-gray-900">
+            Other Documents
+          </CardTitle>
+          {canEvaluate && application && (
+            <EvaluationChecklist
+              applicationId={applicationId}
+              permitType={application.permitType}
+              evaluationType={getEvaluationType()}
+              mode="other"
+              onSuccess={() => {
+                fetchDocuments()
+                onUpdated?.()
+              }}
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
         {error && (

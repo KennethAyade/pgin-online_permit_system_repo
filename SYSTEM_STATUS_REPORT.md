@@ -1,10 +1,10 @@
 # SAG Permit Online Application System - Living Document
 ## Complete System Status Report
 
-**Document Version**: 2.5.2
-**Last Updated**: 2025-12-08
-**Status**: Testing Phase - Manual Evaluation Workflow Restoration
-**Latest Update**: ⚠️ **TESTING** - Restored manual document compliance evaluation workflow. Removed auto-compliance marking from Accept/Reject process and implemented proper evaluation checklist step. Admin must now manually mark documents as compliant/non-compliant in separate evaluation phase. Awaiting client verification of complete workflow.
+**Document Version**: 2.6.0
+**Last Updated**: 2025-12-13
+**Status**: Production Ready - In-Tab Evaluate Feature Complete
+**Latest Update**: ✅ **COMPLETE** - Added "Evaluate" button inside both Acceptance Requirements and Other Documents tabs. Removed redundant top-level Evaluate button from Application Information header. Evaluation now available in-context within each document tab, supporting both acceptance and other document types with proper category separation.
 
 ---
 
@@ -1375,6 +1375,98 @@ These features were intentionally excluded from MVP:
 ---
 
 ## VERSION HISTORY
+
+### Version 2.6.0 (December 13, 2025)
+
+**In-Tab Evaluate Feature for Acceptance Requirements & Other Documents** 📋✅
+
+This version adds the "Evaluate" capability directly inside both Acceptance Requirements and Other Documents tabs, allowing admins to evaluate documents in-context without leaving the tab. The redundant top-level Evaluate button has been removed from the Application Information header.
+
+#### Changes
+
+1. **Extended EvaluationChecklist Component to Support Mode-Based Filtering**
+
+- **File:** `components/admin/evaluation-checklist.tsx`
+- **Changes:**
+  - Added new `mode` prop: `"acceptance"` | `"other"` | `"all"` (default)
+  - Added `OTHER_DOCUMENT_LABELS` mapping for all 14 other document types
+  - Component now fetches both acceptance requirements AND other documents
+  - Pre-fills checklist from both data sources based on ACCEPTED status
+  - Shows section headers ("Document Verification" / "Other Requirements") when mode is "all"
+  - Visual distinction between acceptance (gray badges) and other documents (green badges)
+
+2. **Added Evaluate Button to Acceptance Requirements Tab**
+
+- **File:** `components/admin/admin-acceptance-requirements.tsx`
+- **Changes:**
+  - Added import for `EvaluationChecklist` component
+  - Added state for application data (permitType, status)
+  - Added `fetchApplication()` to get permit type for proper document list
+  - Added `canEvaluate` logic based on application status (SUBMITTED, UNDER_REVIEW, INITIAL_CHECK, TECHNICAL_REVIEW)
+  - Added `getEvaluationType()` function to determine evaluation type
+  - Added `EvaluationChecklist` button in card header with `mode="acceptance"`
+  - Evaluate button only visible when application status allows evaluation
+
+3. **Added Evaluate Button to Other Documents Tab**
+
+- **File:** `components/admin/admin-other-documents.tsx`
+- **Changes:**
+  - Added import for `EvaluationChecklist` component
+  - Added state for application data (permitType, status)
+  - Added `fetchApplication()` to get permit type
+  - Added `canEvaluate` and `getEvaluationType()` logic
+  - Added `EvaluationChecklist` button in card header with `mode="other"`
+  - Evaluate button only visible when application status allows evaluation
+
+4. **Updated Evaluate API to Handle Other Documents Compliance**
+
+- **File:** `app/api/admin/applications/[id]/evaluate/route.ts`
+- **Changes:**
+  - Added `OTHER_DOCUMENT_LABEL_TO_TYPE` mapping for all 14 other document types
+  - Extended compliance update loop to also update `OtherDocument.isCompliant`
+  - Now updates both `AcceptanceRequirement` and `OtherDocument` records based on checklist items
+
+5. **Removed Redundant Top-Level Evaluate Button**
+
+- **File:** `components/admin/admin-application-details.tsx`
+- **Changes:**
+  - Removed `EvaluationChecklist` import (no longer needed at top level)
+  - Removed `canEvaluate` variable
+  - Removed `EvaluationChecklist` component from Application Information card header
+  - Header now only shows Approve, Return, and Reject buttons (via DecisionModal)
+
+#### Impact on Workflow
+
+**Before:**
+- Single Evaluate button at top of Application Information card
+- Showed ALL documents (acceptance + other) in one long list
+- No context about which tab the admin was viewing
+
+**After:**
+- Evaluate button appears in EACH tab (Acceptance Requirements, Other Documents)
+- Each tab's Evaluate only shows relevant documents for that category
+- More intuitive UX: evaluate documents in-context
+- Accept/Reject still works independently from Evaluate
+- Top-level header cleaner with only decision buttons
+
+#### Files Modified Summary
+
+| File | Change |
+|------|--------|
+| `components/admin/evaluation-checklist.tsx` | Extended with `mode` prop, other document labels, dual data fetching |
+| `components/admin/admin-acceptance-requirements.tsx` | Added Evaluate button with `mode="acceptance"` |
+| `components/admin/admin-other-documents.tsx` | Added Evaluate button with `mode="other"` |
+| `app/api/admin/applications/[id]/evaluate/route.ts` | Added OtherDocument compliance updates |
+| `components/admin/admin-application-details.tsx` | Removed top-level Evaluate button |
+
+#### Build Verification
+
+- ✅ Build completed successfully (Next.js 16.0.7)
+- ✅ All 44 routes generated
+- ✅ Zero TypeScript errors
+- ✅ Production ready
+
+---
 
 ### Version 2.5.4 (December 8, 2025)
 

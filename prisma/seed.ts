@@ -46,27 +46,7 @@ async function main() {
 
   console.log('✅ Created evaluator user:', evaluator.email)
 
-  // Create test applicant user
-  const userPassword = await bcrypt.hash('User@123', 10)
-  
-  const user = await prisma.user.upsert({
-    where: { email: 'test@example.com' },
-    update: {},
-    create: {
-      email: 'test@example.com',
-      password: userPassword,
-      fullName: 'Test Applicant',
-      birthdate: new Date('1990-01-01'),
-      mobileNumber: '+63 912 345 6789',
-      companyName: 'Test Mining Company',
-      address: '123 Test Street, Test City',
-      emailVerified: true,
-    },
-  })
-
-  console.log('✅ Created test user:', user.email)
-
-  console.log('\n📋 Test Credentials:')
+  console.log('\n📋 Admin Credentials:')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('Admin Login:')
   console.log('  Email: admin@mgb.gov.ph')
@@ -75,10 +55,6 @@ async function main() {
   console.log('Evaluator Login:')
   console.log('  Email: evaluator@mgb.gov.ph')
   console.log('  Password: Evaluator@123')
-  console.log('')
-  console.log('Test User Login:')
-  console.log('  Email: test@example.com')
-  console.log('  Password: User@123')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 }
 

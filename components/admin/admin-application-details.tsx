@@ -6,7 +6,6 @@ import { StatusBadge } from "@/components/application/status-badge"
 import { StatusTimeline } from "@/components/application/status-timeline"
 import { DocumentList } from "@/components/application/document-list"
 import { DecisionModal } from "./decision-modal"
-import { EvaluationChecklist } from "./evaluation-checklist"
 import { AdminAcceptanceRequirements } from "./admin-acceptance-requirements"
 import { AdminOtherDocuments } from "./admin-other-documents"
 import { format } from "date-fns"
@@ -19,7 +18,6 @@ interface AdminApplicationDetailsProps {
 }
 
 export function AdminApplicationDetails({ application, onUpdate }: AdminApplicationDetailsProps) {
-  const canEvaluate = ["SUBMITTED", "UNDER_REVIEW", "INITIAL_CHECK", "TECHNICAL_REVIEW"].includes(application.status)
   const canApprove = application.status === "FOR_FINAL_APPROVAL"
   const canReturn = ["SUBMITTED", "UNDER_REVIEW", "INITIAL_CHECK", "TECHNICAL_REVIEW"].includes(application.status)
 
@@ -31,20 +29,6 @@ export function AdminApplicationDetails({ application, onUpdate }: AdminApplicat
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-semibold text-gray-900">Application Information</CardTitle>
             <div className="flex gap-2">
-              {canEvaluate && (
-                <EvaluationChecklist
-                  applicationId={application.id}
-                  permitType={application.permitType}
-                  evaluationType={
-                    application.status === "SUBMITTED" || application.status === "UNDER_REVIEW"
-                      ? "INITIAL_CHECK"
-                      : application.status === "TECHNICAL_REVIEW"
-                      ? "TECHNICAL_REVIEW"
-                      : "INITIAL_CHECK"
-                  }
-                  onSuccess={onUpdate}
-                />
-              )}
               {canApprove && (
                 <DecisionModal
                   applicationId={application.id}

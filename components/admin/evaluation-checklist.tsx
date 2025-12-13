@@ -22,6 +22,8 @@ interface EvaluationChecklistProps {
   applicationId: string
   permitType: "ISAG" | "CSAG"
   evaluationType: "INITIAL_CHECK" | "TECHNICAL_REVIEW" | "FINAL_APPROVAL"
+  /** Which documents to show in the checklist: "acceptance", "other", or "all" (default) */
+  mode?: "acceptance" | "other" | "all"
   onSuccess?: () => void
 }
 
@@ -38,62 +40,127 @@ const DOCUMENT_LABELS: Record<string, string> = {
   OTHER_SUPPORTING_PAPERS: "Other Supporting Papers",
 }
 
+const OTHER_DOCUMENT_LABELS: Record<string, string> = {
+  AREA_STATUS_CLEARANCE_CENRO: "Area Status Clearance (CENRO)",
+  AREA_STATUS_CLEARANCE_MGB: "Area Status Clearance (MGB)",
+  CERTIFICATE_POSTING_BARANGAY: "Certificate of Posting (Barangay)",
+  CERTIFICATE_POSTING_MUNICIPAL: "Certificate of Posting (Municipal)",
+  CERTIFICATE_POSTING_PROVINCIAL: "Certificate of Posting (Provincial)",
+  CERTIFICATE_POSTING_CENRO: "Certificate of Posting (CENRO)",
+  CERTIFICATE_POSTING_PENRO: "Certificate of Posting (PENRO)",
+  CERTIFICATE_POSTING_MGB: "Certificate of Posting (MGB)",
+  ECC: "Environmental Compliance Certificate (ECC)",
+  SANGGUNIAN_ENDORSEMENT_BARANGAY: "Sanggunian Endorsement (Barangay)",
+  SANGGUNIAN_ENDORSEMENT_MUNICIPAL: "Sanggunian Endorsement (Municipal)",
+  SANGGUNIAN_ENDORSEMENT_PROVINCIAL: "Sanggunian Endorsement (Provincial)",
+  FIELD_VERIFICATION_REPORT: "Field Verification Report",
+  SURETY_BOND: "Surety Bond",
+}
+
 export function EvaluationChecklist({
   applicationId,
   permitType,
   evaluationType,
+  mode = "all",
   onSuccess,
 }: EvaluationChecklistProps) {
   const [open, setOpen] = useState(false)
-  const [checklist, setChecklist] = useState<Record<string, { isComplete: boolean; isCompliant?: boolean; remarks?: string }>>({})
+  const [checklist, setChecklist] = useState<Record<string, { isComplete: boolean; isCompliant?: boolean; remarks?: string; category: string }>>({})
   const [summary, setSummary] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [acceptanceRequirements, setAcceptanceRequirements] = useState<any[]>([])
+  const [otherDocuments, setOtherDocuments] = useState<any[]>([])
 
-  const requirements = permitType === "ISAG"
+  // Get acceptance requirements based on permit type
+  const acceptanceReqs = permitType === "ISAG"
     ? DOCUMENT_REQUIREMENTS.ISAG.acceptance
     : DOCUMENT_REQUIREMENTS.CSAG.acceptance
 
-  // Fetch acceptance requirements when dialog opens
+  // Get other documents requirements based on permit type
+  const otherReqs = permitType === "ISAG"
+    ? DOCUMENT_REQUIREMENTS.ISAG.other
+    : DOCUMENT_REQUIREMENTS.CSAG.other
+
+  // Determine which requirements to show based on mode
+  const requirements = mode === "acceptance"
+    ? acceptanceReqs
+    : mode === "other"
+    ? otherReqs
+    : [...acceptanceReqs, ...otherReqs]
+
+  // Combined labels for lookup
+  const allLabels = { ...DOCUMENT_LABELS, ...OTHER_DOCUMENT_LABELS }
+
+  // Determine category based on document type
+  const getCategory = (docType: string): "DOCUMENT_VERIFICATION" | "OTHER_REQUIREMENTS" => {
+    return (acceptanceReqs as readonly string[]).includes(docType) ? "DOCUMENT_VERIFICATION" : "OTHER_REQUIREMENTS"
+  }
+
+  // Fetch acceptance requirements and other documents when dialog opens
   useEffect(() => {
     if (open && applicationId) {
-      fetchAcceptanceRequirements()
+      fetchRequirementsData()
     }
   }, [open, applicationId])
 
-  const fetchAcceptanceRequirements = async () => {
+  const fetchRequirementsData = async () => {
     try {
-      const response = await fetch(`/api/acceptanceRequirements/${applicationId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setAcceptanceRequirements(data.requirements || [])
+      // Fetch both acceptance requirements and other documents in parallel
+      const [acceptanceRes, otherDocsRes] = await Promise.all([
+        fetch(`/api/acceptanceRequirements/${applicationId}`),
+        fetch(`/api/admin/otherDocuments/${applicationId}`)
+      ])
+
+      const prefilledChecklist: Record<string, { isComplete: boolean; isCompliant?: boolean; remarks?: string; category: string }> = {}
+
+      // Process acceptance requirements
+      if (acceptanceRes.ok) {
+        const acceptanceData = await acceptanceRes.json()
+        setAcceptanceRequirements(acceptanceData.requirements || [])
 
         // Pre-fill checklist for ACCEPTED requirements
-        const prefilledChecklist: Record<string, { isComplete: boolean; isCompliant?: boolean; remarks?: string }> = {}
-
-        data.requirements?.forEach((req: any) => {
+        acceptanceData.requirements?.forEach((req: any) => {
           if (req.status === "ACCEPTED") {
             prefilledChecklist[req.requirementType] = {
               isComplete: true,
               isCompliant: req.isCompliant ?? undefined,
               remarks: req.adminRemarks || undefined,
+              category: "DOCUMENT_VERIFICATION",
             }
           }
         })
-
-        setChecklist(prefilledChecklist)
       }
+
+      // Process other documents
+      if (otherDocsRes.ok) {
+        const otherDocsData = await otherDocsRes.json()
+        setOtherDocuments(otherDocsData.documents || [])
+
+        // Pre-fill checklist for ACCEPTED other documents
+        otherDocsData.documents?.forEach((doc: any) => {
+          if (doc.status === "ACCEPTED") {
+            prefilledChecklist[doc.documentType] = {
+              isComplete: true,
+              isCompliant: doc.isCompliant ?? undefined,
+              remarks: doc.adminRemarks || undefined,
+              category: "OTHER_REQUIREMENTS",
+            }
+          }
+        })
+      }
+
+      setChecklist(prefilledChecklist)
     } catch (err) {
-      console.error("Failed to fetch acceptance requirements:", err)
+      console.error("Failed to fetch requirements data:", err)
     }
   }
 
   const handleSubmit = async () => {
     const checklistItems = requirements.map((docType, index) => ({
       itemNumber: index + 1,
-      itemName: DOCUMENT_LABELS[docType] || docType,
-      category: "DOCUMENT_VERIFICATION" as const,
+      itemName: allLabels[docType] || docType,
+      category: getCategory(docType),
       isComplete: checklist[docType]?.isComplete || false,
       isCompliant: checklist[docType]?.isCompliant,
       remarks: checklist[docType]?.remarks,
@@ -157,83 +224,106 @@ export function EvaluationChecklist({
         </DialogHeader>
 
         <div className="space-y-4">
-          {requirements.map((docType, index) => (
-            <div key={docType} className="border-2 border-gray-200 rounded-lg p-4 space-y-3 hover:border-gray-300 transition-colors">
-              <div className="flex items-start gap-3">
-                <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded">#{index + 1}</span>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Checkbox
-                      checked={checklist[docType]?.isComplete || false}
-                      onCheckedChange={(checked) =>
-                        setChecklist({
-                          ...checklist,
-                          [docType]: {
-                            ...checklist[docType],
-                            isComplete: checked === true,
-                          },
-                        })
-                      }
-                    />
-                    <Label className="font-medium text-gray-900 text-sm">
-                      {DOCUMENT_LABELS[docType] || docType}
-                    </Label>
+          {/* Show section headers when in "all" mode */}
+          {mode === "all" && (
+            <div className="text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-2 rounded-md">
+              Document Verification (Acceptance Requirements)
+            </div>
+          )}
+          {requirements.map((docType, index) => {
+            // Add section header for Other Requirements when in "all" mode
+            const showOtherHeader = mode === "all" && index === acceptanceReqs.length
+            const isOtherDocument = (otherReqs as readonly string[]).includes(docType)
+
+            return (
+              <div key={docType}>
+                {showOtherHeader && (
+                  <div className="text-sm font-semibold text-green-700 bg-green-50 px-3 py-2 rounded-md mb-4 mt-6">
+                    Other Requirements
                   </div>
-                  {checklist[docType]?.isComplete && (
-                    <div className="ml-6 space-y-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={checklist[docType]?.isCompliant === true}
-                            onCheckedChange={(checked) =>
-                              setChecklist({
-                                ...checklist,
-                                [docType]: {
-                                  ...checklist[docType],
-                                  isCompliant: checked === true,
-                                },
-                              })
-                            }
-                          />
-                          <Label className="text-sm text-green-700 font-medium">Compliant</Label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={checklist[docType]?.isCompliant === false}
-                            onCheckedChange={(checked) =>
-                              setChecklist({
-                                ...checklist,
-                                [docType]: {
-                                  ...checklist[docType],
-                                  isCompliant: checked === true ? false : undefined,
-                                },
-                              })
-                            }
-                          />
-                          <Label className="text-sm text-red-700 font-medium">Non-compliant</Label>
-                        </div>
+                )}
+                <div className="border-2 border-gray-200 rounded-lg p-4 space-y-3 hover:border-gray-300 transition-colors">
+                  <div className="flex items-start gap-3">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${isOtherDocument ? "text-green-600 bg-green-100" : "text-gray-500 bg-gray-100"}`}>#{index + 1}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Checkbox
+                          checked={checklist[docType]?.isComplete || false}
+                          onCheckedChange={(checked) =>
+                            setChecklist({
+                              ...checklist,
+                              [docType]: {
+                                ...checklist[docType],
+                                isComplete: checked === true,
+                                category: getCategory(docType),
+                              },
+                            })
+                          }
+                        />
+                        <Label className="font-medium text-gray-900 text-sm">
+                          {allLabels[docType] || docType}
+                        </Label>
                       </div>
-                      <Textarea
-                        placeholder="Remarks (optional)"
-                        value={checklist[docType]?.remarks || ""}
-                        onChange={(e) =>
-                          setChecklist({
-                            ...checklist,
-                            [docType]: {
-                              ...checklist[docType],
-                              remarks: e.target.value,
-                            },
-                          })
-                        }
-                        rows={2}
-                        className="text-sm border-gray-300"
-                      />
+                      {checklist[docType]?.isComplete && (
+                        <div className="ml-6 space-y-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={checklist[docType]?.isCompliant === true}
+                                onCheckedChange={(checked) =>
+                                  setChecklist({
+                                    ...checklist,
+                                    [docType]: {
+                                      ...checklist[docType],
+                                      isCompliant: checked === true,
+                                      category: getCategory(docType),
+                                    },
+                                  })
+                                }
+                              />
+                              <Label className="text-sm text-green-700 font-medium">Compliant</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                checked={checklist[docType]?.isCompliant === false}
+                                onCheckedChange={(checked) =>
+                                  setChecklist({
+                                    ...checklist,
+                                    [docType]: {
+                                      ...checklist[docType],
+                                      isCompliant: checked === true ? false : undefined,
+                                      category: getCategory(docType),
+                                    },
+                                  })
+                                }
+                              />
+                              <Label className="text-sm text-red-700 font-medium">Non-compliant</Label>
+                            </div>
+                          </div>
+                          <Textarea
+                            placeholder="Remarks (optional)"
+                            value={checklist[docType]?.remarks || ""}
+                            onChange={(e) =>
+                              setChecklist({
+                                ...checklist,
+                                [docType]: {
+                                  ...checklist[docType],
+                                  remarks: e.target.value,
+                                  category: getCategory(docType),
+                                },
+                              })
+                            }
+                            rows={2}
+                            className="text-sm border-gray-300"
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           <div className="space-y-2 pt-4 border-t border-gray-200">
             <Label htmlFor="summary" className="text-sm font-medium text-gray-700">

@@ -122,16 +122,51 @@ export async function POST(
       "Other Supporting Papers": "OTHER_SUPPORTING_PAPERS",
     }
 
+    // Map other document labels to document types
+    const OTHER_DOCUMENT_LABEL_TO_TYPE: Record<string, string> = {
+      "Area Status Clearance (CENRO)": "AREA_STATUS_CLEARANCE_CENRO",
+      "Area Status Clearance (MGB)": "AREA_STATUS_CLEARANCE_MGB",
+      "Certificate of Posting (Barangay)": "CERTIFICATE_POSTING_BARANGAY",
+      "Certificate of Posting (Municipal)": "CERTIFICATE_POSTING_MUNICIPAL",
+      "Certificate of Posting (Provincial)": "CERTIFICATE_POSTING_PROVINCIAL",
+      "Certificate of Posting (CENRO)": "CERTIFICATE_POSTING_CENRO",
+      "Certificate of Posting (PENRO)": "CERTIFICATE_POSTING_PENRO",
+      "Certificate of Posting (MGB)": "CERTIFICATE_POSTING_MGB",
+      "Environmental Compliance Certificate (ECC)": "ECC",
+      "Sanggunian Endorsement (Barangay)": "SANGGUNIAN_ENDORSEMENT_BARANGAY",
+      "Sanggunian Endorsement (Municipal)": "SANGGUNIAN_ENDORSEMENT_MUNICIPAL",
+      "Sanggunian Endorsement (Provincial)": "SANGGUNIAN_ENDORSEMENT_PROVINCIAL",
+      "Field Verification Report": "FIELD_VERIFICATION_REPORT",
+      "Surety Bond": "SURETY_BOND",
+    }
+
     // Update compliance for each checklist item
     for (const item of data.checklistItems) {
+      // Check if this is an acceptance requirement
       const requirementType = DOCUMENT_LABEL_TO_TYPE[item.itemName] as any
-
       if (requirementType) {
         // Find and update the matching AcceptanceRequirement
         await prisma.acceptanceRequirement.updateMany({
           where: {
             applicationId: id,
             requirementType,
+          },
+          data: {
+            isCompliant: item.isCompliant,
+            complianceMarkedAt: new Date(),
+            complianceMarkedBy: session.user.id,
+          },
+        })
+      }
+
+      // Check if this is an other document
+      const otherDocType = OTHER_DOCUMENT_LABEL_TO_TYPE[item.itemName]
+      if (otherDocType) {
+        // Find and update the matching OtherDocument
+        await prisma.otherDocument.updateMany({
+          where: {
+            applicationId: id,
+            documentType: otherDocType,
           },
           data: {
             isCompliant: item.isCompliant,
