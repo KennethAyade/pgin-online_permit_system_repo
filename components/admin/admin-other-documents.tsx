@@ -363,7 +363,3 @@ export function AdminOtherDocuments({ applicationId, onUpdated }: AdminOtherDocu
     </Card>
   )
 }
-      </CardContent>
-    </Card>
-  )
-}
